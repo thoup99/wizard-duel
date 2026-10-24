@@ -1,0 +1,9 @@
+{
+  "name": "pocket-mages",
+  "private": true,
+  "type": "module",
+  "description": "Buildless browser client; Python runs the application.",
+  "scripts": {
+    "dev": "bash scripts/dev.sh"
+  }
+}

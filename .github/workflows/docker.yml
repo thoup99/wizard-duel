@@ -1,0 +1,101 @@
+name: Test and publish Pocket Mages
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  release:
+    types: [published]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: pocket-mages-${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            requirements-dev.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: pip install -r requirements-dev.txt
+      - run: python -m pytest -q
+      - name: Check browser JavaScript
+        run: for file in frontend/js/*.js; do node --check "$file"; done
+      - name: Validate Compose
+        env:
+          POCKET_MAGES_IMAGE: ghcr.io/example/pocket-mages:latest
+        run: |
+          docker compose config --quiet
+          docker compose -f compose.production.yml config --quiet
+      - name: Build and smoke-test the container
+        run: |
+          docker build -t pocket-mages:test .
+          docker run -d --name pocket-mages-test -p 127.0.0.1:8000:8000 pocket-mages:test
+          for i in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8000/api/health; then exit 0; fi
+            sleep 1
+          done
+          docker logs pocket-mages-test
+          exit 1
+      - name: Stop test container
+        if: always()
+        run: docker rm -f pocket-mages-test || true
+  publish:
+    needs: test
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lowercase image name
+        id: image
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ steps.image.outputs.name }}
+          flavor: latest=false
+          tags: |
+            type=sha,prefix=sha-
+            type=raw,value=edge,enable=${{ github.ref == 'refs/heads/main' && github.event_name != 'release' }}
+            type=semver,pattern={{version}},enable=${{ github.event_name == 'release' }}
+            type=raw,value=latest,enable=${{ github.event_name == 'release' && !github.event.release.prerelease }}
+          labels: |
+            org.opencontainers.image.title=Pocket Mages
+            org.opencontainers.image.description=A motion-controlled 2v2 wizard party duel
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Image published
+        env:
+          IMAGE: ${{ steps.image.outputs.name }}
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          echo "### Pocket Mages images" >> "$GITHUB_STEP_SUMMARY"
+          echo "$TAGS" >> "$GITHUB_STEP_SUMMARY"
+          echo 'Stable releases update latest. Main builds update edge.' >> "$GITHUB_STEP_SUMMARY"

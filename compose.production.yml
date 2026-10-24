@@ -1,0 +1,33 @@
+name: pocket-mages
+services:
+  app:
+    image: ${POCKET_MAGES_IMAGE:?Set POCKET_MAGES_IMAGE in .env to your ghcr.io owner/repository:latest}
+    ports:
+      - "${BIND_ADDRESS:-0.0.0.0}:${PORT:-8000}:8000"
+    environment:
+      DEV_MODE: "false"
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
+      MAX_ROOMS: ${MAX_ROOMS:-100}
+      SAMPLE_DIR: /app/samples
+    volumes:
+      - samples:/app/samples
+    restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+  tunnel:
+    profiles: [tunnel]
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate --url http://app:8000
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+volumes:
+  samples:

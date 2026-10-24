@@ -1,0 +1,12 @@
+.git
+.github
+.venv
+.env
+.env.*
+**/__pycache__
+**/.pytest_cache
+samples
+recordings
+tests
+docs
+*.zip

@@ -1,0 +1,8 @@
+export const $ = s => document.querySelector(s);
+export const escape = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+export const teamNames = ['Jade Coven','Rose Order'];
+export const symbols = {bolt:'ϟ',ward:'◉',empower:'↟',hex:'⌁'};
+export function toast(text) { let el = $('#toast'); if (!el) { el=document.createElement('div'); el.id='toast'; el.className='toast'; el.setAttribute('role','status'); document.body.append(el); } el.textContent=text; el.hidden=false; clearTimeout(toast.timer); toast.timer=setTimeout(()=>el.hidden=true,4500); }
+export async function api(path, options={}) { const r = await fetch(path,options); let body; try{body=await r.json();}catch{throw new Error('The server returned an invalid response.');} if(!r.ok)throw new Error(typeof body.detail==='string'?body.detail:'Please check your input.'); return body; }
+export const store = {get(k){try{return localStorage.getItem(k);}catch{return null;}},set(k,v){try{localStorage.setItem(k,v);}catch{}},remove(k){try{localStorage.removeItem(k);}catch{}}};
+export function spellGuide() {return `<details class="help"><summary>Your spellbook · gesture guide</summary><div class="spell-grid">${Object.entries(symbols).map(([s,i])=>`<div class="spell-card"><div class="spell-icon">${i}</div><h3>${s[0].toUpperCase()+s.slice(1)}</h3><p>${{bolt:'Thrust forward · 20 mana',ward:'Draw a circle · 25 mana',empower:'Lift smoothly · 30 mana',hex:'Zigzag sideways · 30 mana'}[s]}</p></div>`).join('')}</div><p class="tiny">Screen toward you, top edge toward your rivals. Hold CAST for 0.3–1.5 seconds while moving, then release. Keep a firm grip and space around you.</p></details>`;}
