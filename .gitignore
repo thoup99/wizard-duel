@@ -1,0 +1,9 @@
+.venv/
+.env
+__pycache__/
+*.py[cod]
+.pytest_cache/
+samples/
+recordings/
+*.zip
+.DS_Store
