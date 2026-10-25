@@ -1,4 +1,4 @@
-import { SPELLS, diagram, caption, setGestureMode, guide } from "./spells.js";
+import { setGestureMode, guide } from "./spells.js";
 import { $, api, store, isLikelyPhone } from "./common.js";
 async function main() {
   let joining = false;
@@ -14,10 +14,6 @@ async function main() {
   }
   const settings = await api("/api/settings");
   setGestureMode(settings.gesture_mode);
-  document.querySelector(".spell-grid").innerHTML = SPELLS.map(
-    (s) =>
-      `<article class="spell-card">${diagram(s.id)}<h3>${s.name} <span class="tiny muted">/ ${s.cost} mana</span></h3><p>${caption(s)}</p></article>`,
-  ).join("");
   document
     .querySelector("#spells")
     .insertAdjacentHTML("beforeend", guide({ includeSpells: false }));
