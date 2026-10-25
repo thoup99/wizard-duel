@@ -30,3 +30,5 @@ Fallback if internet fails: a laptop hotspot and a certificate trusted by every 
 - Check pre/post-roll, interrupted/cancelled presses, long presses and screen wake/portrait lock support. Losing focus must cancel a stroke, not cast it.
 - Measure release-to-result latency including the 100ms post-roll. Target under 300ms; synthetic recognition time alone does not prove this.
 - The default is flicks (right/left/up/down). Optionally test legacy shapes mode, then reload config and refresh all clients so displayed instructions agree.
+
+- First-time player check: ask someone who has not played to follow only the on-screen arrows. Try curved sweeps, off-axis sweeps, and returns past the starting point. Record per-spell successes, fizzles, and wrong spells separately; synthetic percentages are not human accuracy.

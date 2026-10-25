@@ -13,7 +13,7 @@ DEFAULT_CONFIG = ROOT / 'backend/config/gestures.json'
 SHAPES = json.loads((ROOT / 'frontend/spells.json').read_text())
 DEFAULTS = dict(mode='flicks', accept_score=.75, min_margin=.05, resample_points=64,
                 sample_hz=50, min_extent_deg=4, max_extent_deg=120, min_stroke_ms=250,
-                max_window_ms=2500, min_peak_speed_dps=40, fizzle_cooldown_s=.25)
+                max_window_ms=2500, min_peak_speed_dps=40, fizzle_cooldown_s=.25, sweep_error_tolerance=.35)
 HINTS = dict(too_small='Draw it bigger: aim for 20–40 degrees of wrist movement.',
              too_short='Hold CAST while you finish the whole shape.',
              too_slow='Draw with one steady, deliberate motion.',
@@ -22,12 +22,14 @@ HINTS = dict(too_small='Draw it bigger: aim for 20–40 degrees of wrist movemen
 
 def load_config(path=DEFAULT_CONFIG):
     c = json.loads(Path(path).read_text())
+    # Existing mounted configs remain valid and inherit the beginner tolerance.
+    c.setdefault('sweep_error_tolerance', .35)
     if set(c) != set(DEFAULTS) or c['mode'] not in ('shapes', 'flicks'):
         raise ValueError('Use the schema-v2 config keys and mode shapes or flicks.')
     for key, value in c.items():
         if key != 'mode' and (isinstance(value, bool) or not isinstance(value, (int,float)) or not np.isfinite(value) or value <= 0):
             raise ValueError(f'Invalid threshold: {key}')
-    if not (0 < c['accept_score'] <= 1 and 0 < c['min_margin'] < 1
+    if not (0 < c['sweep_error_tolerance'] <= .45 and 0 < c['accept_score'] <= 1 and 0 < c['min_margin'] < 1
             and 16 <= c['resample_points'] <= 128 and int(c['resample_points']) == c['resample_points']
             and 20 <= c['sample_hz'] <= 100 and c['max_window_ms'] <= 2500
             and c['min_stroke_ms'] < c['max_window_ms']
@@ -193,25 +195,38 @@ def recognize(samples, platform='other', config=None, schema_version=2):
     if (times[-1]-times[0])*1000<minimum_ms:return reject('too_short')
     result['path']=np.round(path,3).tolist()
     if c['mode']=='flicks':
-        # Recognize the outward excursion, not net movement after the hand resets.
-        # Smooth/resample above suppresses jitter; a return after release is harmless.
+        # Latch the first deliberate excursion when the hand returns 35% toward
+        # rest. A larger opposite rebound must not change the intended spell.
         origin=path[0]
         distances=np.linalg.norm(path-origin,axis=1)
-        peak=int(np.argmax(distances))
+        peak=0
+        for i in range(1,len(path)):
+            if distances[i]>distances[peak]:peak=i
+            if distances[peak]>=c['min_extent_deg'] and distances[i]<=distances[peak]*.65:
+                break
         if peak<2:return reject('too_small')
         delta=path[peak]-origin;axis=int(np.argmax(abs(delta)))
         outward=path[:peak+1]
         coarse=np.column_stack([np.interp(np.linspace(0,len(outward)-1,12),np.arange(len(outward)),outward[:,i]) for i in range(2)])
         length=np.linalg.norm(np.diff(coarse,axis=0),axis=1).sum()
-        straight=np.linalg.norm(delta)/max(length,1e-8)
-        # Reject repeated shaking and scribbles while allowing one return sweep.
+        distance=np.linalg.norm(delta)
+        straight=min(1.,distance/max(length,1e-8))
+        alignment=abs(delta[axis])/max(distance,1e-8)
+        spell=('bolt' if delta[0]>0 else 'ward') if axis==0 else ('empower' if delta[1]>0 else 'hex')
+        # A normalized fit score, not a probability. Direction carries more weight
+        # than neatness: a shaky/curved sweep can still have a clear intent.
+        score=.6*alignment+.4*straight
+        result.update(score=round(score,4),top_guess=spell)
+        if abs(delta[axis])<c['min_extent_deg']:return reject('too_small')
+        # Only a narrow +/-3 degree band around each diagonal is ambiguous.
+        if alignment<np.cos(np.deg2rad(42)):return reject('ambiguous','fizzle')
         whole=resample(path,24)
         total_length=np.linalg.norm(np.diff(whole,axis=0),axis=1).sum()
-        if abs(delta[axis])<c['min_extent_deg']:return reject('too_small')
-        if straight<.55 or total_length>2.6*np.linalg.norm(delta):return reject('no_match','fizzle')
-        if abs(delta[axis])<1.25*abs(delta[1-axis]):return reject('ambiguous','fizzle')
-        spell=('bolt' if delta[0]>0 else 'ward') if axis==0 else ('empower' if delta[1]>0 else 'hex')
-        score=min(1.,.75+.25*straight);margin=1.
+        # A full return with 35% overshoot travels 2.35 times the outward distance.
+        if total_length>3.2*distance:return reject('no_match','fizzle')
+        if score<1-c.get('sweep_error_tolerance',.35):return reject('no_match','fizzle')
+        result.update(outcome='cast',spell=spell,hint='Spell recognized.',reason=None)
+        return result
     else:spell,score,margin,scores=match_path(path,c);result['scores']=scores
     result.update(score=round(score,4),top_guess=spell)
     if score<c['accept_score']:return reject('no_match','fizzle')

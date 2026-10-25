@@ -37,6 +37,8 @@ jobs:
           node scripts/check_motion.mjs
       - name: Evaluate noisy orientation gestures
         run: python scripts/eval_synthetic.py --count 1000
+      - name: Evaluate beginner curves and returns
+        run: python scripts/eval_beginner.py
       - name: Validate Compose
         env:
           POCKET_MAGES_IMAGE: ghcr.io/example/pocket-mages:latest

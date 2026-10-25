@@ -9,5 +9,6 @@
   "min_stroke_ms": 250,
   "max_window_ms": 2500,
   "min_peak_speed_dps": 40,
-  "fizzle_cooldown_s": 0.25
+  "fizzle_cooldown_s": 0.25,
+  "sweep_error_tolerance": 0.35
 }
