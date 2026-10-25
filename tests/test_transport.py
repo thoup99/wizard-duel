@@ -36,11 +36,13 @@ def test_real_uvicorn_four_phone_transport():
             identities=[]
             for i,ws in enumerate(clients):
                 ws.send(json.dumps({'type':'join','name':f'Network mage {i}'}));identities.append(recv(ws,'joined')['player_id'])
+                for _ in range(3):
+                    ws.send(json.dumps({'type':'practice_cast','label':'bolt','schema_version':2,'samples':sample('bolt')}));recv(ws,'practice_result')
                 ws.send(json.dumps({'type':'ready','ready':True,'sensors_ok':True}))
                 ws.send(json.dumps({'type':'ping','t':1}));recv(ws,'pong')
             clients[0].send(json.dumps({'type':'start'}))
             while recv(clients[0],'state')['phase']!='DUEL':pass
-            clients[0].send(json.dumps({'type':'cast','samples':sample('bolt'),'platform':'other','target_id':identities[2]}))
+            clients[0].send(json.dumps({'type':'cast','schema_version':2,'samples':sample('bolt'),'platform':'other','target_id':identities[2]}))
             for _ in range(20):
                 state=recv(clients[0],'state')
                 target=next(p for p in state['players'] if p['id']==identities[2])

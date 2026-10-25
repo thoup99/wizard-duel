@@ -16,6 +16,8 @@ def test_complete_match_via_motion_casts_then_rematch():
         for i,ws in enumerate(sockets):
             ws.send_json({'type':'join','name':f'Mage {i}'})
             identities.append(receive(ws,'joined')['player_id'])
+            for _ in range(3):
+                ws.send_json({'type':'practice_cast','label':'bolt','schema_version':2,'samples':sample('bolt')});receive(ws,'practice_result')
             ws.send_json({'type':'ready','ready':True,'sensors_ok':True})
             ws.send_json({'type':'ping','t':0});receive(ws,'pong')
         sockets[0].send_json({'type':'start'})
@@ -28,7 +30,7 @@ def test_complete_match_via_motion_casts_then_rematch():
             for target_id in identities[2:]:
                 room.players[target_id].hp=20
                 room.players[identities[0]].cooldown_until=0
-                sockets[0].send_json({'type':'cast','platform':'other','target_id':target_id,'samples':sample('bolt')})
+                sockets[0].send_json({'type':'cast','schema_version':2,'platform':'other','target_id':target_id,'samples':sample('bolt')})
                 sockets[0].send_json({'type':'ping','t':1});receive(sockets[0],'pong')
                 assert room.projectiles
                 room.tick(time.monotonic()+.5)

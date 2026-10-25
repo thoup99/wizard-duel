@@ -36,7 +36,7 @@ def test_empower_hex_modifiers_and_expiry():
 
 def test_cooldown_fizzle_mana_and_dead_player():
     r,p=duel();r.cast(p[0],None,0,3)
-    assert p[0].mana==100 and p[0].cooldown_until==3.5
+    assert p[0].mana==100 and p[0].cooldown_until==3.25
     with pytest.raises(ValueError): r.cast(p[0],'bolt',1,3.1)
     p[0].mana=1
     with pytest.raises(ValueError): r.cast(p[0],'ward',1,4)

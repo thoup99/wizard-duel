@@ -1,0 +1,3 @@
+let context,enabled=false;
+export function enableSound(){try{context=context||new (window.AudioContext||window.webkitAudioContext)();context.resume();enabled=true;}catch{}}
+export function spellSound(spell,outcome){if(!enabled||!context||context.state!=='running'||outcome==='no_cast')return;const oscillator=context.createOscillator(),gain=context.createGain();oscillator.frequency.value=outcome==='fizzle'?120:({bolt:500,ward:330,empower:660,hex:180}[spell]||440);gain.gain.setValueAtTime(.035,context.currentTime);gain.gain.exponentialRampToValueAtTime(.001,context.currentTime+.2);oscillator.connect(gain);gain.connect(context.destination);oscillator.start();oscillator.stop(context.currentTime+.2);}

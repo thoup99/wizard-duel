@@ -1,0 +1,1 @@
+export function isLikelyPhone(env=window){const nav=env.navigator;const touch=nav.maxTouchPoints||0;const coarse=env.matchMedia?.('(pointer: coarse)').matches;const mobile=nav.userAgentData?.mobile;const ipad=nav.platform==='MacIntel'&&touch>1;const sensors=!!(env.DeviceMotionEvent||env.DeviceOrientationEvent);return !!(ipad||mobile||(coarse&&touch>0&&sensors));}

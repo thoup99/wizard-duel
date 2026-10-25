@@ -2,12 +2,14 @@
 from dataclasses import dataclass, field
 import secrets
 
-SPELLS = {
-    'bolt': {'cost': 20, 'gesture': 'Thrust forward', 'description': '20 damage · 0.4s travel'},
-    'ward': {'cost': 25, 'gesture': 'Draw a circle', 'description': '30 shield · 4.5s'},
-    'empower': {'cost': 30, 'gesture': 'Lift smoothly', 'description': '+50% team damage · 6s'},
-    'hex': {'cost': 30, 'gesture': 'Zigzag sideways', 'description': '−40% enemy damage · 6s'},
-}
+import json
+import random
+from pathlib import Path
+from .gestures import SHAPES
+
+SPELLS = {s['id']: dict(cost=s['cost'], gesture=s['caption'], description=s['description']) for s in SHAPES}
+TEAM_NAMES = json.loads((Path(__file__).resolve().parents[1] / 'config/team_names.json').read_text())
+
 
 @dataclass
 class Wizard:
@@ -18,6 +20,7 @@ class Wizard:
     connected: bool = True
     disconnected_at: float | None = None
     ready: bool = False
+    practice_successes: int = 0
     hp: float = 100
     mana: float = 100
     cooldown_until: float = 0
@@ -43,6 +46,32 @@ class Room:
     sequence: int = 0
     winner: int | None = None
     round_winner: int | None = None
+    team_names: list = field(default_factory=list)
+    name_deck: list = field(default_factory=list)
+    name_position: int = 0
+
+    def __post_init__(self):
+        self.name_deck = list(dict.fromkeys(TEAM_NAMES))
+        if len(self.name_deck) < 3: raise ValueError('At least three distinct team names are required.')
+        random.SystemRandom().shuffle(self.name_deck)
+        self.team_names = self.name_deck[:2]
+        self.name_position = 2
+
+    def shuffle_team_name(self, player, team):
+        if self.phase != 'LOBBY' or player.team != team:
+            raise ValueError('Only teammates can shuffle their name in the lobby.')
+        previous = self.team_names[team]
+        for _ in range(len(self.name_deck) * 2):
+            if self.name_position >= len(self.name_deck):
+                random.SystemRandom().shuffle(self.name_deck)
+                self.name_position = 0
+            name = self.name_deck[self.name_position]
+            self.name_position += 1
+            if name not in self.team_names:
+                self.team_names[team] = name
+                self.emit('team_name_changed', team=team, name=name)
+                return
+        raise ValueError('No alternative team name available.')
 
     def emit(self, kind, **data):
         self.sequence += 1
@@ -84,16 +113,20 @@ class Room:
             p.mana, p.cooldown_until, p.effects = 100, 0, {}
         self.emit('round_start', round=self.round_number)
 
-    def cast(self, player, spell, confidence, now, target_id=None):
+    def cast(self, player, spell, confidence, now, target_id=None, recognition=None, fizzle_cooldown=.25):
         if self.phase != 'DUEL' or player.hp <= 0:
             raise ValueError('You can cast only while alive in a duel.')
         if now < player.cooldown_until:
             raise ValueError('Your wand is cooling down.')
+        details = {k: recognition[k] for k in ('score','top_guess','reason','path','hint') if k in recognition} if recognition else {}
+        if recognition and recognition['outcome'] == 'no_cast':
+            self.emit('spell_result', caster=player.id, spell=None, outcome='no_cast', **details)
+            return
         player.stats['attempts'] += 1
         if spell not in SPELLS:
-            player.cooldown_until = now + .5
-            self.emit('spell_result', caster=player.id, spell=None, outcome='fizzled', confidence=confidence,
-                      hint='Make one clear gesture; hold CAST for 0.3–1.5 seconds.')
+            player.cooldown_until = now + fizzle_cooldown
+            self.emit('spell_result', caster=player.id, spell=None, outcome='fizzle', confidence=confidence,
+                      **(details or dict(hint='Hold CAST and trace the full shape.')))
             return
         player.stats['recognized'] += 1
         if player.mana < SPELLS[spell]['cost']:
@@ -125,7 +158,7 @@ class Room:
         elif spell == 'hex':
             target.effects['hex'] = dict(until=now + 6)
         self.emit('spell_result', caster=player.id, target=target.id, spell=spell,
-                  outcome='launched' if spell == 'bolt' else 'applied', confidence=round(confidence, 2))
+                  outcome='cast', confidence=round(confidence, 2), **details)
 
     def tick(self, now):
         for p in list(self.players.values()):
@@ -207,9 +240,10 @@ class Room:
         return dict(type='state', code=self.code, phase=self.phase, host_id=self.host_id,
                     wins=self.wins, round=self.round_number, remaining=max(0, self.deadline - now),
                     winner=self.winner, round_winner=self.round_winner, mvp=self.mvp(), seq=self.sequence,
+                    team_names=self.team_names.copy(), name_position=self.name_position,
                     events=self.events[-12:], spells=SPELLS,
                     players=[dict(id=p.id, name=p.name, team=p.team, connected=p.connected, ready=p.ready,
-                                  hp=round(p.hp, 1), mana=round(p.mana, 1), cooldown=max(0, p.cooldown_until-now),
+                                  practice_successes=p.practice_successes, hp=round(p.hp, 1), mana=round(p.mana, 1), cooldown=max(0, p.cooldown_until-now),
                                   effects={k: dict(remaining=max(0, v['until']-now), amount=v.get('amount')) for k,v in p.effects.items()},
                                   stats={**p.stats, 'accuracy': round(100*p.stats['recognized']/p.stats['attempts']) if p.stats['attempts'] else 0})
                              for p in self.players.values()])

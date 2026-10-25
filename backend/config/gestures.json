@@ -1,22 +1,13 @@
 {
-  "sample_hz": 50,
-  "min_duration": 0.25,
-  "max_duration": 1.8,
-  "idle_accel": 0.7,
-  "idle_gyro": 12,
-  "bolt_peak": 7,
-  "bolt_reversal": 2,
-  "bolt_gyro_max": 150,
-  "hex_amplitude": 90,
-  "hex_reversals": 3,
-  "ward_amplitude": 45,
-  "ward_correlation": 0.65,
-  "empower_angle": 60,
-  "empower_sign_ratio": 0.85,
-  "empower_jerk_max": 1600,
-  "platform_signs": {
-    "ios": [1, 1, 1, 1, 1, 1],
-    "android": [1, 1, 1, 1, 1, 1],
-    "other": [1, 1, 1, 1, 1, 1]
-  }
+ "mode":"shapes",
+ "accept_score":0.75,
+ "min_margin":0.05,
+ "resample_points":64,
+ "sample_hz":50,
+ "min_extent_deg":8,
+ "max_extent_deg":120,
+ "min_stroke_ms":250,
+ "max_window_ms":2500,
+ "min_peak_speed_dps":40,
+ "fizzle_cooldown_s":0.25
 }

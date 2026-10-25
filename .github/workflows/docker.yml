@@ -31,6 +31,12 @@ jobs:
       - run: python -m pytest -q
       - name: Check browser JavaScript
         run: for file in frontend/js/*.js; do node --check "$file"; done
+      - name: Check projection parity and audience routing
+        run: |
+          node scripts/check_frontend.mjs
+          node scripts/check_motion.mjs
+      - name: Evaluate noisy orientation gestures
+        run: python scripts/eval_synthetic.py --count 1000
       - name: Validate Compose
         env:
           POCKET_MAGES_IMAGE: ghcr.io/example/pocket-mages:latest

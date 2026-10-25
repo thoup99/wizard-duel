@@ -3,6 +3,7 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 from backend.app import main
+from test_gestures import sample
 
 def receive(ws, kind):
     for _ in range(40):
@@ -31,7 +32,10 @@ def test_four_players_spectator_and_authority(client):
         sockets[4].send_json({'type':'join','name':'spectator'});assert receive(sockets[4],'spectator')
         sockets[4].send_json({'type':'start'});assert 'Spectators' in receive(sockets[4],'error')['message']
         sockets[1].send_json({'type':'start'});assert 'host' in receive(sockets[1],'error')['message']
-        for ws in sockets[:4]:ws.send_json({'type':'ready','ready':True,'sensors_ok':True})
+        for ws in sockets[:4]:
+            for _ in range(3):
+                ws.send_json({'type':'practice_cast','label':'bolt','schema_version':2,'samples':sample('bolt')});receive(ws,'practice_result')
+            ws.send_json({'type':'ready','ready':True,'sensors_ok':True})
         for ws in sockets[:4]:ws.send_json({'type':'ping','t':1});receive(ws,'pong')
         sockets[0].send_json({'type':'start'})
         state=receive(sockets[0],'state')

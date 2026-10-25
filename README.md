@@ -2,7 +2,7 @@
 
 **Four friends. Two teams. Your phone is your wand.**
 
-A complete core implementation of the supplied Wizard Duel design, renamed Pocket Mages: a motion-controlled, 2v2 browser party game. FastAPI owns combat; mobile browsers send gesture windows over WebSockets. No accounts, database, frontend framework, or frontend build step.
+Pocket Mages v2 implements the original game and the Improvement Design Document: a motion-controlled, 2v2 browser party game. FastAPI owns combat; mobile browsers send gesture windows over WebSockets. No accounts, database, frontend framework, or frontend build step.
 
 ## Play locally with Docker
 
@@ -20,8 +20,8 @@ Open the printed `https://…trycloudflare.com` address on all four phones. It c
 
 1. Enter a mage name and create a room.
 2. Share the four-letter room code or **Copy invite** link with three friends.
-3. Select teams: Jade Coven and Rose Order, two mages each.
-4. Tap **Enable motion sensors**, grant access, and make a test wave. Then tap **I’m ready**.
+3. Select a team (two mages each); teammates can shuffle their randomly assigned team name.
+4. Tap **Enable motion & orientation**, grant both permissions, and wave at least 10 degrees at 30 Hz or faster. Complete three successful casts in the lobby Training Grounds, then tap **I’m ready**.
 5. The host starts a three-second countdown.
 6. Tap an enemy to aim attacks or a teammate to aim shields. Hold **CAST**, perform one gesture, and release.
 7. Open `/arena?room=CODE` on a larger screen for spectators; click **Enable sound** once.
@@ -32,21 +32,21 @@ Keep a firm grip on the phone and room around you. Hold it with the screen facin
 
 | Spell | Gesture | Mana | Result |
 |---|---|---:|---|
-| Bolt | A sharp forward thrust | 20 | 20 damage after 0.4 seconds of travel |
+| Bolt | Lightning Z: across, diagonal down, across | 20 | 20 damage after 0.4 seconds of travel |
 | Ward | Draw a circle in the air | 25 | Absorb 30 damage for 4.5 seconds; self or ally |
-| Empower | A smooth upward sweep | 30 | Both living teammates deal 50% more damage for 6 seconds |
-| Hex | Side-to-side zigzag | 30 | Enemy deals 40% less damage for 6 seconds |
+| Empower | Caret (^): up to a peak, then down | 30 | Both living teammates deal 50% more damage for 6 seconds |
+| Hex | V: down to a point, then up | 30 | Enemy deals 40% less damage for 6 seconds |
 
 - 100 HP and 100 mana per round; regenerate 8 mana/second.
-- One-second global cast cooldown. An unrecognized gesture fizzles without spending mana and incurs a half-second cooldown.
+- One-second global cast cooldown. A deliberate but unmatched shape fizzles without spending mana and incurs a 0.25-second cooldown. Tiny, short, or slow movement is **No cast**, with no cooldown and no accuracy penalty.
 - A round lasts 90 seconds or ends when a team is eliminated. At timeout, higher total team HP wins.
 - First team to two round wins takes the match. The design leaves ties unspecified: tied rounds award no point and replay, so a match can exceed three rounds when tied.
 - Damage modifiers are captured when a Bolt launches; Ward absorbs damage when it arrives. Effects refresh, never stack with themselves.
 - Default offensive target is the lowest-health living enemy. Shields default to self. Attack and shield selections are independent.
 - A defeated mage spectates until the next round; no resurrection within a round.
 - Results include damage dealt, damage blocked, casts, gesture recognition accuracy, and MVP. MVP score is damage + half of damage blocked + 20 per knockout.
-- Gesture accuracy = recognized gestures / attempted casts. It is not hit accuracy; a Ward can block a correctly recognized Bolt.
-- Host can request a rematch, preserving the four players and requiring readiness again.
+- Gesture accuracy = recognized gestures / deliberate attempted casts; No cast and practice are excluded. It is not hit accuracy; a Ward can block a correctly recognized Bolt.
+- Host can request a rematch, preserving the four players and requiring readiness again. Team names and practice progress stay with the players.
 
 ## Publish Docker releases with GitHub Actions
 
@@ -183,43 +183,44 @@ docker compose -f docker-compose.yml -f compose.dev.yml up --build
 
 Development mode allows readiness without sensors and shows four direct spell buttons. Production Compose hard-disables it, and the server rejects `dev_cast` messages when disabled. Development reloads destroy active rooms.
 
-## Gesture validation and tuning
+## Orientation gestures and Training Grounds (v2)
 
-Recognition is rule-based and **not calibrated against your phones yet**. Synthetic tests prove that the implemented patterns classify as intended; they do not establish the document's 85% real-world recognition target or the under-300ms network latency target.
+The old thrust/lift/zigzag acceleration rules are retired. Aim the phone's top edge like a wand and draw a Z, circle, caret (^), or V. Both drawing directions work. Up stays up: the matcher does not rotate a caret into a V. Approximately 20–40 degrees of wrist movement is enough.
 
-- `/debug`: live acceleration/rotation graphs.
-- `/record`: labeled capture with local JSON download, optional protected server upload, and threshold reload.
-- `backend/config/gestures.json`: thresholds and per-platform six-axis sign multipliers.
-- `scripts/eval_gestures.py`: a confusion matrix over real recordings, including negative `unknown` examples.
+`frontend/spells.json` is the shared source for spell names, costs, colors, captions and shape geometry. It drives server templates and frontend SVG diagrams. The browser shows a live trail; the server makes all recognition and combat decisions. Each result includes a score, closest spell, reason and projected path for the ghost overlay. The arena displays the latest stroke too.
 
-Capture at least 10 examples per spell per tester, on the actual iOS/Android phones. Record negative examples too. Keep tuning and evaluation recordings separate; evaluate held-out recordings to avoid tuning to the test set.
+Capture uses relative `deviceorientation` events with concurrent motion/orientation permission requests on iOS, about 150ms pre-roll and 100ms post-roll, and a 2.5-second maximum window. Gyro integration is a fallback when fused orientation is absent; its drift and initial grip assumptions still require device testing. A wake lock during a duel and portrait lock are requested where the browser supports them.
+
+Rows are `[seconds, alpha, beta, gamma, rx, ry, rz]` with `schema_version: 2`. Old clients and old acceleration recordings are rejected; refresh all phones after deploying. The backend sorts timestamps, removes duplicates, resamples pointing vectors at 50Hz, smooths and projects into the stroke plane. It never subtracts or interpolates Euler angles. Paths are resampled to 64 points and matched without rotation against generated shape variants. Short/small/slow strokes are No cast; ambiguous or low-scoring deliberate shapes fizzle.
+
+- `/practice`: standalone Training Grounds, also linked from How to Play.
+- Lobby Training Grounds: three server-confirmed matches unlock Ready. Standalone practice does not grant room readiness.
+- Optional recording checkbox: defaults off, stores prompted labels and raw v2 windows in the samples volume without mage names or tokens. Prompted labels are not automatically verified ground truth; inspect recordings before evaluation.
+- `/debug` and `/record`: orientation/gyro graphs and labeled JSON capture; downloads require no admin token.
+- `backend/config/gestures.json`: reloadable matching/gating thresholds, including `accept_score`, `min_margin`, and `fizzle_cooldown_s`.
+
+Set `mode` to `flicks` for Plan B: right= Bolt, left= Ward, up= Empower, down= Hex. Reload the config and refresh the browser pages so their diagrams match the active mode. Production can bind-mount an edited config at `/app/backend/config/gestures.json:ro`. Reloading or saving manually from the lab requires `ADMIN_TOKEN`; explicitly opted-in practice recording uses its separate bounded endpoint.
 
 ```bash
 python scripts/eval_gestures.py recordings/ --minimum-accuracy 0.85
-```
-
-The script returns a nonzero status for an unmet target, no samples, or malformed files. Samples are rows `[seconds, ax, ay, az, rx, ry, rz]`; browser rotation beta/gamma/alpha map to x/y/z. The server resamples at 50Hz, smooths, trims idle sections, and demeans dynamic channels. It deliberately preserves raw gyro for Empower's signed integrated angle, since demeaning would erase the signal.
-
-Platform sign multipliers default to +1 until actual measurements justify a flip; there is no unverified blanket iOS inversion. Most rules are direction-independent. The client uses linear acceleration where available, otherwise a low-pass gravity estimate. Hold the phone consistently during calibration.
-
-For server-side saving/reloading, set a long random `ADMIN_TOKEN` in `.env`, restart the app, and enter it on the lab page. It is held only in that page's memory, not localStorage. Samples can always be downloaded locally without a token. For live file tuning, bind-mount your config into `/app/backend/config/gestures.json` read-only, edit the host file, then use the reload button. Invalid thresholds leave the previous config active.
-
-## Tests
-
-```bash
+python scripts/eval_synthetic.py --count 1000
+node scripts/check_frontend.mjs
 python -m pytest -q
 ```
 
-32 automated tests cover engine rules, gesture signatures and malformed samples, API access, four-player joins, spectators, reconnect identity, full-match recognized-motion casts, rematch, and production rejection of direct spell buttons. A full match uses real protocol handlers with the simulation clock advanced for fast execution. A separate TCP test starts Uvicorn, connects four real WebSocket clients, completes the countdown, and verifies a recognized Bolt damages its target.
+Synthetic evaluation uses independent shape definitions, 1–2 degree Gaussian jitter, half-to-double size variation, ±20% width, ±10-degree shear, uneven speed, 30–100Hz input, varying heading/tilt/wrist roll and reversed paths. See `docs/synthetic-results.json` for the deterministic seed-452 results. Shared Python/JavaScript projection vectors include heading wrap and both vertical singularities.
 
-Verification performed during delivery:
+The local synthetic run recognized 98.2% Bolt, 99.3% Ward, 97.5% Empower and 96.9% Hex (1,000 each), with no wrong-spell selections in those sets. It rejected 99.4% of 1,000 random-wave/tap cases. Local p95 recognition time was approximately 1.4ms. These results **do not establish real-phone accuracy or network latency**. Complete the updated four-phone checklist before judging the 85% real-phone and under-15% fizzle targets.
 
-- 32 tests passed.
-- All browser JavaScript passed `node --check`.
-- Python source compiled and the update script passed `bash -n`.
-- Docker and real-phone/browser rendering were unavailable for local verification. GitHub CI performs the Docker build, Compose validation and health smoke test when uploaded.
+## Audience and team identity
 
-Before the first demo, run the four-phone checklist in `docs/DEMO_CHECKLIST.md`.
+Desktop invite/code joins go directly to the arena, without a name prompt. The audience view has **Join as a player instead** for tablets/developers. Room creation still creates a player; the first player is host. A fifth player or new mid-match join becomes audience automatically. Audience connections cannot cast, ready, practice or shuffle names.
+
+Each room draws two names from `backend/config/team_names.json`. Players may shuffle only their own team's name in the lobby; names do not repeat until the shared shuffled deck is exhausted and remain through rematches. Team A uses a gold star; Team B uses a violet diamond. Both use green health and blue mana, with text labels. Team identity is separate from HP/mana colors.
+
+## Verification
+
+The expanded regression suite covers the original game rules and transport plus v2 projection, geometry matching, gating, practice readiness, recording consent, spectator authorization and team-name shuffling. CI also runs the 4,000-cast synthetic gate, shared JavaScript/Python projection checks, Compose validation and a built-container health check. Physical iPhone/Android tests and rendered browser QA still need to be completed on the deployed site.
 
 ## Project map
 
@@ -239,4 +240,4 @@ See `docs/PROTOCOL.md` for API/message details. Spell audio is synthesized in-br
 
 ## Scope
 
-The complete **core game** in the design is implemented. The explicitly optional stretch features—Heal, Counter, Combo Blast, and DTW template matching—are not enabled or represented as finished features. No accounts, matchmaking, persistence, or anti-cheat system was added, matching the design's non-goals.
+The complete **core game** in the design is implemented. The explicitly optional stretch features—Heal, Counter, Combo Blast, per-player practice templates, custom team names, and DTW template matching—are not enabled or represented as finished features. No accounts, matchmaking, persistence, or anti-cheat system was added, matching the design's non-goals.

@@ -21,7 +21,10 @@ def main():
         try:
             item = json.loads(path.read_text());label = item['label']
             if label not in labels: raise ValueError('Unknown label')
-            prediction, _ = recognize(item['samples'], item.get('platform', 'other'), config)
+            if item.get('schema_version') != 2: raise ValueError('Legacy sample: record again using orientation schema 2.')
+            if item.get('mode', config['mode']) != config['mode']: raise ValueError('Sample gesture mode differs from the active config.')
+            result = recognize(item['samples'], item.get('platform', 'other'), config, 2)
+            prediction = result['spell']
             prediction = prediction or 'unknown'
             matrix[label][prediction] += 1;total += 1;correct += prediction == label
         except (KeyError, ValueError) as exc:

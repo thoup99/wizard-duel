@@ -1,0 +1,89 @@
+[
+  {
+    "id": "bolt",
+    "name": "Bolt",
+    "color": "#e9c879",
+    "cost": 20,
+    "caption": "Zip a Z: across, diagonal down, across.",
+    "shape": "polyline",
+    "points": [
+      [
+        22,
+        22
+      ],
+      [
+        78,
+        22
+      ],
+      [
+        22,
+        78
+      ],
+      [
+        78,
+        78
+      ]
+    ],
+    "description": "20 damage \u00b7 0.4s travel"
+  },
+  {
+    "id": "ward",
+    "name": "Ward",
+    "color": "#6edada",
+    "cost": 25,
+    "caption": "Draw a full circle. Either direction works.",
+    "shape": "circle",
+    "center": [
+      50,
+      50
+    ],
+    "radius": 30,
+    "description": "30 shield \u00b7 4.5s"
+  },
+  {
+    "id": "empower",
+    "name": "Empower",
+    "color": "#f0d790",
+    "cost": 30,
+    "caption": "Draw a peak: up, then down. Up is buff.",
+    "shape": "polyline",
+    "points": [
+      [
+        20,
+        75
+      ],
+      [
+        50,
+        25
+      ],
+      [
+        80,
+        75
+      ]
+    ],
+    "description": "+50% team damage \u00b7 6s"
+  },
+  {
+    "id": "hex",
+    "name": "Hex",
+    "color": "#c4afe8",
+    "cost": 30,
+    "caption": "Draw a V: down, then up. Down is debuff.",
+    "shape": "polyline",
+    "points": [
+      [
+        20,
+        25
+      ],
+      [
+        50,
+        75
+      ],
+      [
+        80,
+        25
+      ]
+    ],
+    "description": "\u221240% enemy damage \u00b7 6s"
+  }
+]

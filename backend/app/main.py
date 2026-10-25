@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, ValidationError
 
 from .engine import Room, SPELLS
-from .gestures import DEFAULT_CONFIG, load_config, recognize, validate_samples
+from .gestures import DEFAULT_CONFIG, load_config, recognize, validate_samples, SHAPES
 
 ROOT = Path(__file__).resolve().parents[2]
 DEV_MODE = os.getenv('DEV_MODE', 'false').lower() == 'true'
@@ -37,14 +37,19 @@ class Message(BaseModel):
     sensors_ok: StrictBool = False
     target_id: str | None = Field(default=None, max_length=40)
     platform: str = Field(default='other', pattern='^(ios|android|other)$')
-    samples: list = Field(default_factory=list, max_length=240)
+    samples: list = Field(default_factory=list, max_length=320)
+    schema_version: StrictInt | None = None
+    save_sample: StrictBool = False
+    label: str | None = Field(default=None, pattern='^(bolt|ward|empower|hex|unknown)$')
     spell: str | None = Field(default=None, max_length=12)
     t: float | None = None
 
 class Sample(BaseModel):
+    schema_version: StrictInt = 2
+    mode: str = Field(default="shapes", pattern="^(shapes|flicks)$")
     label: str = Field(pattern='^(bolt|ward|empower|hex|unknown)$')
     platform: str = Field(pattern='^(ios|android|other)$')
-    samples: list = Field(max_length=240)
+    samples: list = Field(max_length=320)
 
 class Peer:
     def __init__(self, ws):
@@ -73,6 +78,7 @@ class Manager:
         self.tasks = {}
         self.config = load_config(CONFIG_PATH)
         self.create_limits = {}
+        self.practice_limits = {}
 
     def create(self):
         if len(self.rooms) >= MAX_ROOMS:
@@ -131,6 +137,7 @@ app = FastAPI(title='Pocket Mages', lifespan=lifespan)
 @app.middleware('http')
 async def headers(request, call_next):
     response = await call_next(request)
+    response.headers['Cache-Control'] = 'no-cache'
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['Referrer-Policy'] = 'same-origin'
     response.headers['Permissions-Policy'] = 'accelerometer=(self), gyroscope=(self)'
@@ -143,7 +150,7 @@ async def health():
 
 @app.get('/api/settings')
 async def settings():
-    return dict(dev_mode=DEV_MODE, spells=SPELLS)
+    return dict(dev_mode=DEV_MODE, spells=SPELLS, shapes=SHAPES, gesture_mode=manager.config['mode'], schema_version=2)
 
 @app.post('/api/rooms', status_code=201)
 async def create_room(request: Request):
@@ -189,12 +196,41 @@ async def save_sample(sample: Sample, request: Request):
         validate_samples(sample.samples)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
+    if sample.schema_version != 2:
+        raise HTTPException(400, 'Orientation schema 2 is required.')
     SAMPLE_DIR.mkdir(parents=True, exist_ok=True)
     if len(list(SAMPLE_DIR.glob('*.json'))) >= 10000:
         raise HTTPException(507, 'Sample storage is full.')
     filename = f'{sample.label}-{secrets.token_hex(8)}.json'
     (SAMPLE_DIR / filename).write_text(sample.model_dump_json())
     return {'filename': filename}
+
+def store_practice(message):
+    """Explicit opt-in only. Labels are prompts, not claimed ground truth."""
+    try:
+        SAMPLE_DIR.mkdir(parents=True, exist_ok=True)
+        if len(list(SAMPLE_DIR.glob('*.json'))) >= 10000: return False
+        payload = dict(schema_version=2, label=message.label, platform=message.platform,
+                       samples=message.samples, source='practice_prompt', mode=manager.config['mode'])
+        (SAMPLE_DIR / f'practice-{secrets.token_hex(12)}.json').write_text(json.dumps(payload))
+        return True
+    except OSError:
+        log.warning('Could not save opted-in practice sample')
+        return False
+
+@app.post('/api/practice')
+async def practice(message: Message, request: Request):
+    now=time.monotonic();ip=request.client.host if request.client else 'unknown'
+    manager.practice_limits={k:v for k,v in manager.practice_limits.items() if now-v[-1]<60}
+    hits=[t for t in manager.practice_limits.get(ip,[]) if now-t<60]
+    if len(hits)>=60: raise HTTPException(429,'Take a moment before practicing again.')
+    manager.practice_limits[ip]=hits+[now]
+    if message.label not in SPELLS: raise HTTPException(400,'Choose a practice spell.')
+    try: result=recognize(message.samples,message.platform,manager.config,message.schema_version)
+    except ValueError as exc: raise HTTPException(400,str(exc)) from exc
+    return dict(type='practice_result', **result, expected=message.label,
+                success=result['outcome']=='cast' and result['spell']==message.label,
+                saved=store_practice(message) if message.save_sample else False)
 
 def check_origin(ws):
     origin = ws.headers.get('origin')
@@ -213,7 +249,8 @@ async def socket(ws: WebSocket, code: str):
         return
     await ws.accept()
     if len(manager.peers[code]) >= 40:
-        await ws.close(code=1013, reason='Too many spectators')
+        await ws.send_json(dict(type='error', code='audience_full', message='The audience is full. Try again when someone leaves.'))
+        await ws.close(code=1013, reason='Audience full')
         return
     peer = Peer(ws)
     player = None
@@ -280,9 +317,20 @@ async def socket(ws: WebSocket, code: str):
                 elif message.type == 'ready' and message.ready is not None:
                     if room.phase != 'LOBBY':
                         raise ValueError('Ready is available in the lobby.')
-                    if message.ready and not (message.sensors_ok or DEV_MODE):
-                        raise ValueError('Enable motion and complete your test wave first.')
+                    if message.ready and not DEV_MODE and (not message.sensors_ok or player.practice_successes < 3):
+                        raise ValueError('Enable sensors and complete three successful practice casts first.')
                     player.ready = message.ready
+                elif message.type == 'shuffle_team_name' and message.team is not None:
+                    room.shuffle_team_name(player, message.team)
+                elif message.type == 'practice_cast':
+                    if room.phase != 'LOBBY': raise ValueError('Practice is available in the lobby.')
+                    if message.label not in SPELLS: raise ValueError('Choose a practice spell.')
+                    result = recognize(message.samples, message.platform, manager.config, message.schema_version)
+                    success = result['outcome'] == 'cast' and result['spell'] == message.label
+                    if success: player.practice_successes += 1
+                    saved = store_practice(message) if message.save_sample else False
+                    peer.send(dict(type='practice_result', **result, success=success, expected=message.label,
+                                   practice_successes=player.practice_successes, saved=saved))
                 elif message.type == 'start':
                     room.start(player, now)
                 elif message.type == 'rematch':
@@ -301,10 +349,11 @@ async def socket(ws: WebSocket, code: str):
                     if message.type == 'dev_cast':
                         if not DEV_MODE:
                             raise ValueError('Development casts are disabled.')
-                        spell, confidence = message.spell, 1.0
+                        spell, confidence, result = message.spell, 1.0, None
                     else:
-                        spell, confidence = recognize(message.samples, message.platform, manager.config)
-                    room.cast(player, spell, confidence, now, message.target_id)
+                        result = recognize(message.samples, message.platform, manager.config, message.schema_version)
+                        spell, confidence = result['spell'], result['score']
+                    room.cast(player, spell, confidence, now, message.target_id, result, manager.config['fizzle_cooldown_s'])
                 else:
                     raise ValueError('Unknown or incomplete command.')
                 room.last_activity = now
@@ -330,7 +379,7 @@ async def index():
 @app.get('/{page}')
 async def page(page: str):
     name = page.removesuffix('.html')
-    if name not in ('phone', 'arena', 'debug', 'record'):
+    if name not in ('phone', 'arena', 'debug', 'record', 'practice'):
         raise HTTPException(404)
     return FileResponse(ROOT / f'frontend/{name}.html')
 
