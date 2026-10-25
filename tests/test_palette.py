@@ -4,7 +4,7 @@ import colorsys,re
 def test_team_contrast_and_health_hue_separation():
     css=(Path(__file__).resolve().parents[1]/'frontend/css/base.css').read_text()
     def rgb(name):
-        value=re.search(r'--'+name+r':#([0-9a-f]{6})',css)[1]
+        value = re.search(r'--' + re.escape(name) + r'\s*:\s*#([0-9a-fA-F]{6})', css)[1]
         return tuple(int(value[i:i+2],16)/255 for i in [0,2,4])
     def luminance(c):
         c=[x/12.92 if x<=.04045 else ((x+.055)/1.055)**2.4 for x in c]
