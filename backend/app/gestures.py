@@ -11,7 +11,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CONFIG = ROOT / 'backend/config/gestures.json'
 SHAPES = json.loads((ROOT / 'frontend/spells.json').read_text())
-DEFAULTS = dict(mode='flicks', accept_score=.75, min_margin=.05, resample_points=64,
+DEFAULTS = dict(mode='mixed', accept_score=.75, min_margin=.05, resample_points=64,
                 sample_hz=50, min_extent_deg=4, max_extent_deg=120, min_stroke_ms=250,
                 max_window_ms=2500, min_peak_speed_dps=40, fizzle_cooldown_s=.25, sweep_error_tolerance=.35)
 HINTS = dict(too_small='Draw it bigger: aim for 20–40 degrees of wrist movement.',
@@ -24,8 +24,8 @@ def load_config(path=DEFAULT_CONFIG):
     c = json.loads(Path(path).read_text())
     # Existing mounted configs remain valid and inherit the beginner tolerance.
     c.setdefault('sweep_error_tolerance', .35)
-    if set(c) != set(DEFAULTS) or c['mode'] not in ('shapes', 'flicks'):
-        raise ValueError('Use the schema-v2 config keys and mode shapes or flicks.')
+    if set(c) != set(DEFAULTS) or c['mode'] not in ('shapes', 'flicks', 'mixed'):
+        raise ValueError('Use the schema-v2 config keys and mode shapes, flicks or mixed.')
     for key, value in c.items():
         if key != 'mode' and (isinstance(value, bool) or not isinstance(value, (int,float)) or not np.isfinite(value) or value <= 0):
             raise ValueError(f'Invalid threshold: {key}')
@@ -167,16 +167,67 @@ def match_path(path,c):
     best,second=ranked[:2]
     return best,scores[best],scores[best]-scores[second],scores
 
+def stabilize_horizontal(path):
+    """Reduce incidental vertical movement only for clearly horizontal strokes.
+
+    Preserve both axes for circles, Zs, diagonals and vertical flicks.
+    Kept equivalent to frontend projection.stabilizeHorizontal.
+    """
+    p=np.array(path,dtype=float,copy=True)
+    if len(p)<2:return p
+    extent=np.ptp(p,axis=0)
+    if extent[0]>=4 and extent[0]>2.5*extent[1] and np.abs(np.diff(p[:,0])).sum()<2.6*extent[0]:
+        p[:,1]=p[0,1]+.55*(p[:,1]-p[0,1])
+    return p
+
+@lru_cache(maxsize=1)
+def mixed_templates():
+    groups={}
+    for spell in ('ward','hex'):
+        definition=next(s['mixed'] for s in SHAPES if s['id']==spell)
+        base=resample(shape_points(definition),64)
+        variants=[]
+        for width in (.65,1.,1.5):
+            q=base.copy();q[:,0]*=width
+            if spell=='ward':
+                for start in range(0,63,7):
+                    curve=np.roll(q[:-1],start,axis=0);curve=np.vstack([curve,curve[:1]])
+                    variants.extend([normalize(curve,64),normalize(curve[::-1],64)])
+            else:
+                for sx,sy in ((1,1),(-1,1),(1,-1),(-1,-1)):
+                    curve=q*np.array([sx,sy])
+                    variants.extend([normalize(curve,64),normalize(curve[::-1],64)])
+        groups[spell]=np.array(variants)
+    return groups
+
+def match_mixed_shapes(path):
+    p=normalize(path,64)
+    closure,corners,turn,length=geometry(p)
+    extent=np.ptp(p,axis=0)
+    scores={}
+    for spell,group in mixed_templates().items():
+        distance=np.linalg.norm(group-p[None,:,:],axis=2).mean(axis=1).min()
+        score=max(0.,1-float(distance)/(2**.5/2))
+        if spell=='ward' and (closure>.65 or not 220<=turn<=500 or extent.min()<.25):score=0.
+        if spell=='hex' and (not 2<=corners<=4 or extent[0]<.6*extent[1] or extent[1]<.20):score=0.
+        scores[spell]=score
+    best=max(scores,key=scores.get)
+    # An incomplete multi-turn shape must not become its initial Bolt/Empower.
+    shape_like=corners>=2 and extent.min()>.20 and (extent[0]>=.6*extent[1] or turn>=220)
+    return best,scores[best],shape_like,scores
+
 def recognize(samples, platform='other', config=None, schema_version=2):
     if schema_version!=2:raise ValueError('This server needs orientation schema_version 2. Refresh the page.')
     c=config or load_config();a=validate_samples(samples)
     result=dict(outcome='no_cast',spell=None,score=0.,top_guess=None,reason=None,path=[],scores={})
     def reject(reason,outcome='no_cast'):
         hint=HINTS[reason]
-        if c['mode']=='flicks':
+        if c['mode'] in ('flicks','mixed'):
             hint=dict(too_small='Aim the top of your phone a little farther in the arrow direction.', too_short='Hold CAST, make one short sweep, then release.', too_slow='Make one comfortable sweep in the arrow direction.', ambiguous='Follow one arrow: right, left, up or down.', no_match='Make one small wrist sweep in the arrow direction; avoid repeated shaking.')[reason]
+        if c['mode']=='mixed' and reason in ('ambiguous','no_match'):
+            hint='Try right for Bolt, a circle for Ward, a loose Z for Hex, or up for Empower.'
         result.update(reason=reason,outcome=outcome,hint=hint);return result
-    minimum_ms=min(c['min_stroke_ms'],80) if c['mode']=='flicks' else c['min_stroke_ms']
+    minimum_ms=min(c['min_stroke_ms'],80) if c['mode'] in ('flicks','mixed') else c['min_stroke_ms']
     if a[-1,0]*1000<minimum_ms:return reject('too_short')
     if a[-1,0]*1000>c['max_window_ms']:return reject('no_match','fizzle')
     try:times,path=clean_project(a,c)
@@ -186,7 +237,7 @@ def recognize(samples, platform='other', config=None, schema_version=2):
     if extent<c['min_extent_deg']:return reject('too_small')
     if extent>c['max_extent_deg']:return reject('no_match','fizzle')
     speeds=np.linalg.norm(np.diff(path,axis=0),axis=1)*c['sample_hz']
-    minimum_speed=min(c['min_peak_speed_dps'],8) if c['mode']=='flicks' else c['min_peak_speed_dps']
+    minimum_speed=min(c['min_peak_speed_dps'],8) if c['mode'] in ('flicks','mixed') else c['min_peak_speed_dps']
     if speeds.max(initial=0)<minimum_speed:return reject('too_slow')
     active=np.flatnonzero(speeds>max(6.,speeds.max()*.08))
     if len(active):
@@ -194,7 +245,17 @@ def recognize(samples, platform='other', config=None, schema_version=2):
         path=path[start:end];times=times[start:end]
     if (times[-1]-times[0])*1000<minimum_ms:return reject('too_short')
     result['path']=np.round(path,3).tolist()
-    if c['mode']=='flicks':
+    if c['mode']=='mixed':
+        path=stabilize_horizontal(path)
+        result['path']=np.round(path,3).tolist()
+        spell,score,shape_like,scores=match_mixed_shapes(path)
+        if score>=1-c.get('sweep_error_tolerance',.35):
+            result.update(outcome='cast',spell=spell,score=round(score,4),top_guess=spell,scores=scores,hint='Spell recognized.')
+            return result
+        if shape_like:
+            result.update(score=round(score,4),top_guess=spell,scores=scores)
+            return reject('no_match','fizzle')
+    if c['mode'] in ('flicks','mixed'):
         # Latch the first deliberate excursion when the hand returns 35% toward
         # rest. A larger opposite rebound must not change the intended spell.
         origin=path[0]
@@ -217,6 +278,7 @@ def recognize(samples, platform='other', config=None, schema_version=2):
         # than neatness: a shaky/curved sweep can still have a clear intent.
         score=.6*alignment+.4*straight
         result.update(score=round(score,4),top_guess=spell)
+        if c['mode']=='mixed' and spell not in ('bolt','empower'):return reject('no_match','fizzle')
         if abs(delta[axis])<c['min_extent_deg']:return reject('too_small')
         # Only a narrow +/-3 degree band around each diagonal is ambiguous.
         if alignment<np.cos(np.deg2rad(42)):return reject('ambiguous','fizzle')

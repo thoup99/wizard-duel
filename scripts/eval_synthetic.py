@@ -7,7 +7,7 @@ from backend.app.gestures import recognize,load_config
 from scripts.synthetic_gestures import path_to_rows,ideal,sweep
 
 def evaluate(count=1000):
-    rng=np.random.default_rng(452);report={};timings=[];config=load_config()
+    rng=np.random.default_rng(452);report={};timings=[];config=dict(load_config(),mode="flicks")
     for spell in ['bolt','ward','empower','hex']:
         counts={k:0 for k in ['bolt','ward','empower','hex','rejected']}
         for i in range(count):

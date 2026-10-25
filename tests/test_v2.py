@@ -23,9 +23,9 @@ def test_shuffle_permissions_and_rematch_persistence():
 def test_no_cast_has_no_penalty_and_fizzle_is_quarter_second():
     r=Room('TEST',0);p=r.add('A',0);r.begin_round(0)
     result=recognize(sample('idle'));r.cast(p,None,0,1,recognition=result)
-    assert p.cooldown_until==0 and p.stats['attempts']==0 and p.mana==100
+    assert p.cooldown_until==0 and p.stats['attempts']==0 and p.mana==40
     result=dict(outcome='fizzle',score=.6,top_guess='hex',reason='no_match',path=[],hint='Try again')
-    r.cast(p,None,.6,1,recognition=result);assert p.cooldown_until==1.25 and p.stats['attempts']==1 and p.mana==100
+    r.cast(p,None,.6,1,recognition=result);assert p.cooldown_until==1.25 and p.stats['attempts']==1 and p.mana==40
 
 def test_ready_requires_three_server_confirmed_practice_casts(client):
     code=client.post('/api/rooms').json()['code']

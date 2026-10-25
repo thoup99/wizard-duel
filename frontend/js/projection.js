@@ -6,3 +6,17 @@ export function project(rows){if(!rows.length)return [];const axes=rows.map(row=
 // Body-axis Rodrigues integration, used only when fused events are missing.
 export function integrate(matrix,rates,dt){const w=rates.map(x=>x*Math.PI/180*dt),angle=Math.hypot(...w);if(angle<1e-9)return matrix;const [x,y,z]=w.map(v=>v/angle),c=Math.cos(angle),s=Math.sin(angle),t=1-c;const q=[[t*x*x+c,t*x*y-s*z,t*x*z+s*y],[t*x*y+s*z,t*y*y+c,t*y*z-s*x],[t*x*z-s*y,t*y*z+s*x,t*z*z+c]];return matrix.map(row=>q[0].map((_,j)=>row.reduce((sum,v,k)=>sum+v*q[k][j],0)));}
 export function angles(matrix){return [Math.atan2(-matrix[0][1],matrix[1][1])*180/Math.PI,Math.asin(Math.max(-1,Math.min(1,matrix[2][1])))*180/Math.PI,Math.atan2(-matrix[2][0],matrix[2][2])*180/Math.PI];}
+
+// Match the server's horizontal-only wobble damping; preserve two-axis shapes.
+export function stabilizeHorizontal(path){
+ if(path.length<2)return path;
+ const extent=[0,1].map(i=>Math.max(...path.map(p=>p[i]))-Math.min(...path.map(p=>p[i])));
+ if(extent[0]>=4&&extent[0]>2.5*extent[1]&&path.slice(1).reduce((sum,p,i)=>sum+Math.abs(p[0]-path[i][0]),0)<2.6*extent[0])return path.map(([x,y])=>[x,path[0][1]+.55*(y-path[0][1])]);
+ return path;
+}
+export function preview(rows){
+ const p=project(rows);
+ // Five-sample moving average for the display, comparable to sensor cleanup.
+ const smooth=p.map((_,i)=>[0,1].map(axis=>[-2,-1,0,1,2].reduce((v,k)=>v+p[Math.max(0,Math.min(p.length-1,i+k))][axis],0)/5));
+ return stabilizeHorizontal(smooth);
+}

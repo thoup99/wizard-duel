@@ -1,5 +1,5 @@
 {
-  "mode": "flicks",
+  "mode": "mixed",
   "accept_score": 0.75,
   "min_margin": 0.05,
   "resample_points": 64,

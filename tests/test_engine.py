@@ -18,25 +18,25 @@ def test_four_ready_players_required_and_capacity():
 def test_countdown_and_bolt_travel():
     r,p=duel();assert r.phase=='DUEL'
     r.cast(p[0],'bolt',1,3,p[2].id)
-    assert p[0].mana==80 and p[2].hp==100
+    assert p[0].mana==20 and p[2].hp==100
     r.tick(3.39);assert p[2].hp==100
     r.tick(3.41);assert p[2].hp==80 and p[0].stats['damage']==20
 
 def test_ward_absorbs_and_exhausts():
     r,p=duel();r.cast(p[2],'ward',1,3);r.cast(p[0],'bolt',1,3,p[2].id);r.tick(3.5)
-    assert p[2].hp==100 and p[2].effects['ward']['amount']==10
-    r.cast(p[0],'bolt',1,4.1,p[2].id);r.tick(4.6)
-    assert p[2].hp==90 and 'ward' not in p[2].effects and p[2].stats['blocked']==30
+    assert p[2].hp==100 and p[2].effects['ward']['amount']==8
+    r.cast(p[0],'bolt',1,4.3,p[2].id);r.tick(4.8)
+    assert p[2].hp==88 and 'ward' not in p[2].effects and p[2].stats['blocked']==28
 
 def test_empower_hex_modifiers_and_expiry():
     r,p=duel();r.cast(p[0],'empower',1,3);assert 'empower' in p[1].effects
     r.cast(p[2],'hex',1,3,p[1].id);r.cast(p[1],'bolt',1,3,p[3].id);r.tick(3.5)
-    assert p[3].hp==82
-    r.tick(9.1);assert not p[1].effects
+    assert p[3].hp==pytest.approx(81.8)
+    r.tick(15.1);assert not p[1].effects
 
 def test_cooldown_fizzle_mana_and_dead_player():
     r,p=duel();r.cast(p[0],None,0,3)
-    assert p[0].mana==100 and p[0].cooldown_until==3.25
+    assert p[0].mana==40 and p[0].cooldown_until==3.25
     with pytest.raises(ValueError): r.cast(p[0],'bolt',1,3.1)
     p[0].mana=1
     with pytest.raises(ValueError): r.cast(p[0],'ward',1,4)
@@ -45,8 +45,8 @@ def test_cooldown_fizzle_mana_and_dead_player():
     with pytest.raises(ValueError): r.cast(p[0],'bolt',1,5)
 
 def test_mana_regen_and_cap():
-    r,p=duel();p[0].mana=50;r.tick(3.5);assert p[0].mana==54
-    p[0].mana=99;r.tick(4);assert p[0].mana==100
+    r,p=duel();p[0].mana=50;r.tick(3.5);assert p[0].mana==50.75
+    p[0].mana=99.5;r.tick(4);assert p[0].mana==100
 
 def test_best_of_three_and_rematch():
     r,p=duel();p[2].hp=p[3].hp=0;r.tick(4)
@@ -58,11 +58,11 @@ def test_best_of_three_and_rematch():
     assert all(not p.ready and p.hp==100 for p in r.players.values())
 
 def test_timeout_tie_replays_without_point():
-    r,p=duel();r.tick(93)
+    r,p=duel();r.tick(68)
     assert r.phase=='ROUND_END' and r.round_winner is None and r.wins==[0,0]
 
 def test_timeout_total_hp_winner():
-    r,p=duel();p[0].hp=99;r.tick(93);assert r.round_winner==1
+    r,p=duel();p[0].hp=99;r.tick(68);assert r.round_winner==1
 
 def test_disconnect_host_transfer_grace_and_forfeit():
     r,p=duel();p[0].connected=False;p[0].disconnected_at=4;r.tick(4)

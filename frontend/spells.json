@@ -35,13 +35,27 @@
         50
       ]
     ],
-    "sweep_caption": "Sweep right. A small wrist turn is enough."
+    "sweep_caption": "Sweep right. A small wrist turn is enough.",
+    "mixed": {
+      "shape": "polyline",
+      "points": [
+        [
+          20,
+          50
+        ],
+        [
+          80,
+          50
+        ]
+      ],
+      "caption": "Punch your wrist to the right, then relax. A small turn is enough."
+    }
   },
   {
     "id": "ward",
     "name": "Ward",
     "color": "#6edada",
-    "cost": 25,
+    "cost": 22,
     "caption": "Draw a full circle. Either direction works.",
     "shape": "circle",
     "center": [
@@ -49,7 +63,7 @@
       50
     ],
     "radius": 30,
-    "description": "30 shield \u00b7 4.5s",
+    "description": "28 shield \u00b7 7s",
     "sweep_points": [
       [
         80,
@@ -60,13 +74,22 @@
         50
       ]
     ],
-    "sweep_caption": "Sweep left. A small wrist turn is enough."
+    "sweep_caption": "Sweep left. A small wrist turn is enough.",
+    "mixed": {
+      "shape": "circle",
+      "center": [
+        50,
+        50
+      ],
+      "radius": 30,
+      "caption": "Draw one loose circle. Either direction and any starting point work."
+    }
   },
   {
     "id": "empower",
     "name": "Empower",
     "color": "#f0d790",
-    "cost": 30,
+    "cost": 28,
     "caption": "Draw a peak: up, then down. Up is buff.",
     "shape": "polyline",
     "points": [
@@ -83,7 +106,7 @@
         75
       ]
     ],
-    "description": "+50% team damage \u00b7 6s",
+    "description": "+40% team damage \u00b7 10s",
     "sweep_points": [
       [
         50,
@@ -94,13 +117,27 @@
         20
       ]
     ],
-    "sweep_caption": "Sweep up. A small wrist turn is enough."
+    "sweep_caption": "Sweep up. A small wrist turn is enough.",
+    "mixed": {
+      "shape": "polyline",
+      "points": [
+        [
+          50,
+          80
+        ],
+        [
+          50,
+          20
+        ]
+      ],
+      "caption": "Flick your wrist straight up, then relax."
+    }
   },
   {
     "id": "hex",
     "name": "Hex",
     "color": "#c4afe8",
-    "cost": 30,
+    "cost": 24,
     "caption": "Draw a V: down, then up. Down is debuff.",
     "shape": "polyline",
     "points": [
@@ -117,7 +154,7 @@
         25
       ]
     ],
-    "description": "\u221240% enemy damage \u00b7 6s",
+    "description": "\u221235% enemy damage \u00b7 12s",
     "sweep_points": [
       [
         50,
@@ -128,6 +165,28 @@
         80
       ]
     ],
-    "sweep_caption": "Sweep down. A small wrist turn is enough."
+    "sweep_caption": "Sweep down. A small wrist turn is enough.",
+    "mixed": {
+      "shape": "polyline",
+      "points": [
+        [
+          20,
+          25
+        ],
+        [
+          80,
+          25
+        ],
+        [
+          20,
+          75
+        ],
+        [
+          80,
+          75
+        ]
+      ],
+      "caption": "Draw a loose Z: across, back diagonally, across. Two turns."
+    }
   }
 ]

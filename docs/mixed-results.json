@@ -1,0 +1,28 @@
+{
+  "bolt": {
+    "correct": 400,
+    "wrong": 0,
+    "rejected": 0,
+    "total": 400
+  },
+  "ward": {
+    "correct": 400,
+    "wrong": 0,
+    "rejected": 0,
+    "total": 400
+  },
+  "hex": {
+    "correct": 400,
+    "wrong": 0,
+    "rejected": 0,
+    "total": 400
+  },
+  "empower": {
+    "correct": 400,
+    "wrong": 0,
+    "rejected": 0,
+    "total": 400
+  },
+  "negative_rejection": 0.9925,
+  "passed": true
+}

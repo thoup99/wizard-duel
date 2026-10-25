@@ -24,7 +24,7 @@ def test_complete_match_via_motion_casts_then_rematch():
         sockets[0].send_json({'type':'ping','t':0});receive(sockets[0],'pong')
         room=main.manager.rooms[code]
         assert room.phase=='COUNTDOWN'
-        # Advance the simulation clock rather than making CI wait 90 seconds.
+        # Advance the simulation clock rather than making CI wait a full round.
         for round_index in range(2):
             room.begin_round(time.monotonic())
             for target_id in identities[2:]:

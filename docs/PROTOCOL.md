@@ -41,7 +41,7 @@ Practice is lobby-only and does not change combat stats. Three accepted casts ma
 
 Recognition results are `spell_result` entries in state.events:
 
-- outcome `cast`: accepted and applied/launched; one-second cooldown, normal mana cost.
+- outcome `cast`: accepted and applied/launched; 1.25-second cooldown, normal mana cost.
 - outcome `fizzle`: deliberate unmatched shape; no mana cost, configurable 0.25s cooldown; counts in accuracy.
 - outcome `no_cast`: too_short, too_small or too_slow; no mana/cooldown/stat penalty.
 - score, top_guess, reason (`too_small`, `too_short`, `too_slow`, `ambiguous`, `no_match`), hint and angular path accompany recognition feedback.
@@ -49,4 +49,4 @@ Recognition results are `spell_result` entries in state.events:
 
 Other events: team_name_changed, countdown, round_start, knockout, disconnect_forfeit, round_end, match_end. Track seq to avoid replaying sound. Phases and combat rules are unchanged. No cast doesn't advance attempt counters; practice is excluded from match accuracy.
 
-Config mode `flicks` uses net path direction rather than shape templates; refresh pages after switching mode to load matching diagrams. Keep server and clients on the same release. The sensor adapter prefers fused relative orientation and falls back to short-window body-rate integration when unavailable.
+Default config mode `mixed` uses right/up directional recognition plus circle/Z templates. Legacy `flicks` recognizes four directions from the first deliberate outward excursion; `shapes` retains the original four templates. Sample recordings include their mode (`mixed`, `flicks` or `shapes`); refresh pages after switching mode to load matching diagrams. Keep server and clients on the same release. The sensor adapter prefers fused relative orientation and falls back to short-window body-rate integration when unavailable.

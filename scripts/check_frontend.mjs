@@ -12,3 +12,18 @@ assert.equal(isLikelyPhone(env(true,5,true)),true);
 assert.equal(isLikelyPhone(env(false,5,false,'MacIntel')),true);
 assert.equal(isLikelyPhone(env(false,1,false)),false);
 console.log('Projection parity, gyro integration and audience detection passed.');
+const {stabilizeHorizontal,preview}=await import('../frontend/js/projection.js');
+assert.deepEqual(stabilizeHorizontal([[0,0],[10,2],[20,-3],[30,1]]),[[0,0],[10,1.1],[20,-1.6500000000000001],[30,.55]]);
+const zigzag=[[0,0],[20,0],[0,-5],[20,-5]];
+assert.deepEqual(stabilizeHorizontal(zigzag),zigzag);
+assert.deepEqual(preview([]),[]);
+// Verify the same spell definitions drive guides in every supported mode.
+globalThis.fetch=async()=>({ok:true,json:async()=>JSON.parse(fs.readFileSync(new URL('../frontend/spells.json',import.meta.url)))});
+const spellbook=await import('../frontend/js/spells.js');
+assert.equal(spellbook.gestureMode,'mixed');
+for(const spell of spellbook.SPELLS){
+ assert.equal(spellbook.caption(spell),spell.mixed.caption);
+ assert.ok(spellbook.diagram(spell.id).includes(spell.mixed.caption));
+ assert.equal(spellbook.points(spell).length,spell.id==='ward'?65:spell.id==='hex'?4:2);
+}
+console.log('Horizontal damping and mixed spellbook diagrams passed.');

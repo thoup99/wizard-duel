@@ -33,20 +33,26 @@ Keep a firm grip on the phone and room around you. Hold it with the screen facin
 | Spell | Gesture | Mana | Result |
 |---|---|---:|---|
 | Bolt | Sweep right → | 20 | 20 damage after 0.4 seconds of travel |
-| Ward | Sweep left ← | 25 | Absorb 30 damage for 4.5 seconds; self or ally |
-| Empower | Sweep up ↑ | 30 | Both living teammates deal 50% more damage for 6 seconds |
-| Hex | Sweep down ↓ | 30 | Enemy deals 40% less damage for 6 seconds |
+| Ward | Loose circle, either direction | 22 | Absorb 28 damage for 7 seconds; self or ally |
+| Empower | Sweep up ↑ | 28 | Both living teammates deal 40% more damage for 10 seconds |
+| Hex | Loose Z-shaped zigzag | 24 | Enemy deals 35% less damage for 12 seconds |
 
-- 100 HP and 100 mana per round; regenerate 8 mana/second.
-- One-second global cast cooldown. A deliberate but unmatched shape fizzles without spending mana and incurs a 0.25-second cooldown. Tiny, short, or slow movement is **No cast**, with no cooldown and no accuracy penalty.
-- A round lasts 90 seconds or ends when a team is eliminated. At timeout, higher total team HP wins.
-- First team to two round wins takes the match. The design leaves ties unspecified: tied rounds award no point and replay, so a match can exceed three rounds when tied.
+- 100 HP and 40 starting mana per round, with a 100-mana cap; regenerate 1.5 mana/second.
+- 1.25-second global cast cooldown. A deliberate but unmatched shape fizzles without spending mana and incurs a 0.25-second cooldown. Tiny, short, or slow movement is **No cast**, with no cooldown and no accuracy penalty.
+- A round lasts 65 seconds or ends when a team is eliminated. At timeout, higher total team HP wins; tied HP is broken by the surviving players’ total mana.
+- First team to two round wins takes the match. Exact ties in both health and surviving mana award no point and replay; simultaneous knockouts also replay.
 - Damage modifiers are captured when a Bolt launches; Ward absorbs damage when it arrives. Effects refresh, never stack with themselves.
 - Default offensive target is the lowest-health living enemy. Shields default to self. Attack and shield selections are independent.
 - A defeated mage spectates until the next round; no resurrection within a round.
 - Results include damage dealt, damage blocked, casts, gesture recognition accuracy, and MVP. MVP score is damage + half of damage blocked + 20 per knockout.
 - Gesture accuracy = recognized gestures / deliberate attempted casts; No cast and practice are excluded. It is not hit accuracy; a Ward can block a correctly recognized Bolt.
 - Host can request a rematch, preserving the four players and requiring readiness again. Team names and practice progress stay with the players.
+
+## Match pacing
+
+Best-of-three matches target about three minutes on average, with 65-second rounds, 5-second intermissions and 3-second countdowns. Two full rounds take 2m21s; three take 3m34s. Early knockouts shorten matches and exact ties can extend them. Starting mana is 40 and regeneration is 1.5/s (down from 8/s), so saving for a coordinated burst matters.
+
+A seeded simulation of 200 matches using identical randomized policies for both teams averaged **179.8 seconds**, with 103 versus 97 wins and no unfinished matches. See `scripts/eval_balance.py` and `docs/balance-results.json`. This is a balance estimate, not a guarantee for human play.
 
 ## Publish Docker releases with GitHub Actions
 
@@ -185,15 +191,17 @@ Development mode allows readiness without sensors and shows four direct spell bu
 
 ## Orientation gestures and Training Grounds (v2)
 
-The default controls are four single directional sweeps: right = Bolt, left = Ward, up = Empower, down = Hex. Hold CAST, turn the phone’s top edge in the arrow direction, then release. Returning your hand naturally is fine. A comfortable 6–15 degree wrist movement is enough; there are no corners or loops to memorize.
+The default `mixed` spellbook gives each spell a distinct motion: **Bolt** is a short wrist punch to the right, **Ward** is a loose circle, **Hex** is a Z-shaped zigzag with two turns, and **Empower** is a straight upward flick. Hold CAST for the entire motion and release to cast. Circles accept either direction and any starting point; zigzags accept either drawing direction. Aim the phone’s top edge like a wand: sideways translation without wrist rotation is not reliably measured by the orientation sensors.
+
+Clearly horizontal motions have their incidental vertical movement reduced by 45%, both in recognition and the smoothed live preview. This applies only when horizontal extent is over 2.5 times vertical extent and the path is not a repeated horizontal zigzag. Circles and zigzags retain both axes.
 
 `frontend/spells.json` is the shared source for spell names, costs, colors, captions and shape geometry. It drives server templates and frontend SVG diagrams. The browser shows a live trail; the server makes all recognition and combat decisions. Each result includes a score, closest spell, reason and projected path for the ghost overlay. The arena displays the latest stroke too.
 
 Capture uses relative `deviceorientation` events with concurrent motion/orientation permission requests on iOS, about 150ms pre-roll and 100ms post-roll, and a 2.5-second maximum window. Gyro integration is a fallback when fused orientation is absent; its drift and initial grip assumptions still require device testing. A wake lock during a duel and portrait lock are requested where the browser supports them.
 
-Rows are `[seconds, alpha, beta, gamma, rx, ry, rz]` with `schema_version: 2`. Old clients and old acceleration recordings are rejected; refresh all phones after deploying. The backend sorts timestamps, removes duplicates, resamples pointing vectors at 50Hz, smooths and projects into the stroke plane. It never subtracts or interpolates Euler angles. Directional recognition uses the first deliberate outward excursion and a coarse path to tolerate sensor jitter, curved sweeps, and a natural return to the starting position. It accepts strokes from 80ms and 8 degrees/second peak speed, with at least 4 degrees of travel. Sweeps up to 42 degrees away from a cardinal direction are eligible; the narrow band around an exact diagonal remains ambiguous. Repeated shaking is rejected. A return with up to 35% overshoot is supported. Legacy shape mode resamples 64 points for template matching. Short/small/slow strokes are No cast; ambiguous or low-scoring deliberate shapes fizzle.
+Rows are `[seconds, alpha, beta, gamma, rx, ry, rz]` with `schema_version: 2`. Old clients and old acceleration recordings are rejected; refresh all phones after deploying. The backend sorts timestamps, removes duplicates, resamples pointing vectors at 50Hz, smooths and projects into the stroke plane. It never subtracts or interpolates Euler angles. Directional recognition uses the first deliberate outward excursion and a coarse path to tolerate sensor jitter, curved sweeps, and a natural return to the starting position. It accepts strokes from 80ms and 8 degrees/second peak speed, with at least 4 degrees of travel. Sweeps up to 42 degrees away from a cardinal direction are eligible; the narrow band around an exact diagonal remains ambiguous. Repeated shaking is rejected. A return with up to 35% overshoot is supported. Circle and zigzag recognition compare 64-point paths against oval/start-point/direction variants, with geometry checks to prevent an incomplete multi-turn shape becoming an attack. Legacy shape mode remains available. Short/small/slow strokes are No cast; ambiguous or low-scoring deliberate shapes fizzle.
 
-The default `sweep_error_tolerance: 0.35` accepts a normalized match score of at least 0.65. The score is `0.6 × direction alignment + 0.4 × path efficiency`: alignment is the cosine of the angle to the nearest arrow, and efficiency is outward displacement divided by smoothed outward path length. This is a motion-fit measure, not a probability or a guaranteed human success rate. Size, duration, diagonal ambiguity, and repeated-shake checks still apply. Legacy `accept_score` applies only to shape mode. Existing configs without the new key inherit 0.35.
+The default `sweep_error_tolerance: 0.35` accepts a normalized match score of at least 0.65. The score is `0.6 × direction alignment + 0.4 × path efficiency`: alignment is the cosine of the angle to the nearest arrow, and efficiency is outward displacement divided by smoothed outward path length. Circles and zigzags use normalized template-distance scores with the same 0.65 acceptance threshold. These are motion-fit measures, not probabilities or a guaranteed human success rate. Size, duration, diagonal ambiguity, and repeated-shake checks still apply. Legacy `accept_score` applies only to shape mode. Existing configs without the new key inherit 0.35.
 
 - `/practice`: standalone Training Grounds, also linked from How to Play.
 - Lobby Training Grounds: three server-confirmed matches unlock Ready. Standalone practice does not grant room readiness.
@@ -201,7 +209,7 @@ The default `sweep_error_tolerance: 0.35` accepts a normalized match score of at
 - `/debug` and `/record`: orientation/gyro graphs and labeled JSON capture; downloads require no admin token.
 - `backend/config/gestures.json`: reloadable matching/gating thresholds, including `accept_score`, `min_margin`, and `fizzle_cooldown_s`.
 
-`mode: flicks` is now the default. Set `mode: shapes` only to restore the legacy Z/circle/^/V controls. Refresh every browser after changing modes. Production can bind-mount an edited config at `/app/backend/config/gestures.json:ro`; update existing mounted configs to `flicks` and `min_extent_deg: 4` too. Reloading or saving manually from the lab requires `ADMIN_TOKEN`.
+`mode: mixed` is the default. `mode: flicks` restores the previous four-arrow controls, and `mode: shapes` restores Z/circle/^/V. Refresh every browser after deployment or mode changes. If you bind-mount a custom config at `/app/backend/config/gestures.json:ro`, update its mode to `mixed`; an old mounted config overrides the image default. Reloading or saving manually from the lab requires `ADMIN_TOKEN`.
 
 ```bash
 python scripts/eval_gestures.py recordings/ --minimum-accuracy 0.85
@@ -210,9 +218,9 @@ node scripts/check_frontend.mjs
 python -m pytest -q
 ```
 
-The deterministic evaluation in `docs/beginner-results.json` covers 1,000 noisy sweeps per spell and 1,000 negative movements: 98.2–99.2% correct recognition, at most 1.1% wrong-spell selection, and 92.2% negative rejection. The more forgiving controls accept more random movement than earlier versions; casting still requires holding CAST.
+The current mixed-mode evaluation (`scripts/eval_mixed.py`, `docs/mixed-results.json`) tests 400 examples per spell with noise, varying grip, speed, size, oval circles, reverse drawing, curved flicks and returns. It matched all 1,600 intended spells and rejected 99.25% of 400 idle/random paths. These synthetic results are not real-phone or first-time-player accuracy. Test the four motions on your actual phones before judging usability.
 
-A separate independent beginner suite in `scripts/eval_beginner.py` covers 1,600 motions with up to 35% sideways drift, 35% curvature, and 35% return overshoot, varying size, speed, grip, and sensor rate. All 1,600 matched the intended spell (`docs/beginner-motion-results.json`). Both evaluations run in CI. These are synthetic tests; first-time players on real iOS/Android devices still need to validate usability.
+CI also retains the earlier flick-mode evaluations (`eval_synthetic.py`, `eval_beginner.py`) explicitly in legacy flick mode to protect compatibility.
 
 ## Audience and team identity
 

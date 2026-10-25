@@ -8,6 +8,11 @@ from pathlib import Path
 from .gestures import SHAPES
 
 SPELLS = {s['id']: dict(cost=s['cost'], gesture=s['caption'], description=s['description']) for s in SHAPES}
+ROUND_SECONDS = 65
+START_MANA = 40
+MANA_REGEN = 1.5
+CAST_COOLDOWN = 1.25
+
 TEAM_NAMES = json.loads((Path(__file__).resolve().parents[1] / 'config/team_names.json').read_text())
 
 
@@ -22,9 +27,13 @@ class Wizard:
     ready: bool = False
     practice_successes: int = 0
     hp: float = 100
-    mana: float = 100
+    mana: float = START_MANA
     cooldown_until: float = 0
     effects: dict = field(default_factory=dict)
+    caught_from: str | None = None
+    caught_until: float = 0
+    echo_target: str | None = None
+    echo_until: float = 0
     target_id: str | None = None
     ally_id: str | None = None
     stats: dict = field(default_factory=lambda: dict(damage=0, blocked=0, casts=0, attempts=0, recognized=0, kills=0))
@@ -106,11 +115,13 @@ class Room:
         self.emit('countdown', seconds=3)
 
     def begin_round(self, now):
-        self.phase, self.deadline, self.last_tick = 'DUEL', now + 90, now
+        self.phase, self.deadline, self.last_tick = 'DUEL', now + ROUND_SECONDS, now
         self.projectiles.clear()
         for p in self.players.values():
             p.hp = 0 if p.disconnected_at is not None and now - p.disconnected_at >= 60 else 100
-            p.mana, p.cooldown_until, p.effects = 100, 0, {}
+            p.mana, p.cooldown_until, p.effects = START_MANA, 0, {}
+            p.caught_from = p.echo_target = None
+            p.caught_until = p.echo_until = 0
         self.emit('round_start', round=self.round_number)
 
     def cast(self, player, spell, confidence, now, target_id=None, recognition=None, fizzle_cooldown=.25):
@@ -129,8 +140,6 @@ class Room:
                       **(details or dict(hint='Hold CAST and trace the full shape.')))
             return
         player.stats['recognized'] += 1
-        if player.mana < SPELLS[spell]['cost']:
-            raise ValueError('Not enough mana. Let your wand recharge.')
         enemies = [p for p in self.players.values() if p.team != player.team and p.hp > 0]
         if spell in ('bolt', 'hex'):
             target = self.players.get(target_id or player.target_id)
@@ -142,21 +151,31 @@ class Room:
                 target = player
         if target is None:
             raise ValueError('No living target.')
-        player.mana -= SPELLS[spell]['cost']
-        player.cooldown_until = now + 1
+        echo = spell == 'bolt' and player.echo_target == target.id and player.echo_until > now
+        cost = SPELLS[spell]['cost'] - (5 if echo else 0)
+        if player.mana < cost:
+            raise ValueError('Not enough mana. Let your wand recharge.')
+        player.mana -= cost
+        player.cooldown_until = now + CAST_COOLDOWN
         player.stats['casts'] += 1
         if spell == 'bolt':
-            damage = 20 * (1.5 if player.effects.get('empower', {}).get('until', 0) > now else 1)
-            damage *= .6 if player.effects.get('hex', {}).get('until', 0) > now else 1
+            damage = (26 if echo else 20) * (1.4 if player.effects.get('empower', {}).get('until', 0) > now else 1)
+            damage *= .65 if player.effects.get('hex', {}).get('until', 0) > now else 1
+            if echo:
+                player.echo_target, player.echo_until = None, 0
             self.projectiles.append(dict(at=now + .4, source=player.id, target=target.id, damage=damage))
         elif spell == 'ward':
-            target.effects['ward'] = dict(until=now + 4.5, amount=30)
+            target.effects['ward'] = dict(until=now + 7, amount=28, charged=False)
+            target.caught_from, target.caught_until = None, 0
         elif spell == 'empower':
             for ally in self.players.values():
                 if ally.team == player.team and ally.hp > 0:
-                    ally.effects['empower'] = dict(until=now + 6)
+                    ally.effects['empower'] = dict(until=now + 10)
         elif spell == 'hex':
-            target.effects['hex'] = dict(until=now + 6)
+            target.effects['hex'] = dict(until=now + 12)
+            if player.caught_from == target.id and player.caught_until > now:
+                player.echo_target, player.echo_until = target.id, now + 6
+                player.caught_from, player.caught_until = None, 0
         self.emit('spell_result', caster=player.id, target=target.id, spell=spell,
                   outcome='cast', confidence=round(confidence, 2), **details)
 
@@ -183,7 +202,7 @@ class Room:
         self.last_tick = now
         for p in self.players.values():
             if p.hp > 0:
-                p.mana = min(100, p.mana + 8 * dt)
+                p.mana = min(100, p.mana + MANA_REGEN * dt)
             p.effects = {k: v for k, v in p.effects.items() if v['until'] > now}
         due = [b for b in self.projectiles if b['at'] <= now]
         self.projectiles = [b for b in self.projectiles if b['at'] > now]
@@ -198,6 +217,9 @@ class Room:
                 damage -= absorbed
                 ward['amount'] -= absorbed
                 target.stats['blocked'] += absorbed
+                if absorbed > 0 and not ward.get('charged', False):
+                    target.caught_from, target.caught_until = source.id, now + 4
+                    ward['charged'] = True
                 if ward['amount'] <= 0:
                     del target.effects['ward']
             damage = min(target.hp, damage)
@@ -211,6 +233,10 @@ class Room:
         hp = [sum(p.hp for p in self.players.values() if p.team == team) for team in (0, 1)]
         if min(hp) <= 0 or now >= self.deadline:
             winner = None if abs(hp[0] - hp[1]) < .001 else int(hp[1] > hp[0])
+            if winner is None and min(hp) > 0 and now >= self.deadline:
+                mana = [sum(p.mana for p in self.players.values() if p.team == team and p.hp > 0) for team in (0, 1)]
+                if abs(mana[0] - mana[1]) >= .001:
+                    winner = int(mana[1] > mana[0])
             self.round_winner = winner
             if winner is not None:
                 self.wins[winner] += 1
@@ -232,7 +258,9 @@ class Room:
         self.winner = self.round_winner = None
         self.events.clear()
         for p in self.players.values():
-            p.ready, p.hp, p.mana, p.effects, p.cooldown_until = False, 100, 100, {}, 0
+            p.ready, p.hp, p.mana, p.effects, p.cooldown_until = False, 100, START_MANA, {}, 0
+            p.caught_from = p.echo_target = None
+            p.caught_until = p.echo_until = 0
             p.stats = dict(damage=0, blocked=0, casts=0, attempts=0, recognized=0, kills=0)
         self.last_activity = now
 

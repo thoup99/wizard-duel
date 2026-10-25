@@ -1,0 +1,13 @@
+{
+  "matches": 200,
+  "mean_seconds": 179.8,
+  "median_seconds": 141.0,
+  "p10_seconds": 141.0,
+  "p90_seconds": 214.0,
+  "team_wins": [
+    103,
+    97
+  ],
+  "unfinished": 0,
+  "passed": true
+}

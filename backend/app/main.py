@@ -46,7 +46,7 @@ class Message(BaseModel):
 
 class Sample(BaseModel):
     schema_version: StrictInt = 2
-    mode: str = Field(default="shapes", pattern="^(shapes|flicks)$")
+    mode: str = Field(default="mixed", pattern="^(shapes|flicks|mixed)$")
     label: str = Field(pattern='^(bolt|ward|empower|hex|unknown)$')
     platform: str = Field(pattern='^(ios|android|other)$')
     samples: list = Field(max_length=320)
@@ -150,7 +150,7 @@ async def health():
 
 @app.get('/api/settings')
 async def settings():
-    spells={s['id']:dict(SPELLS[s['id']],gesture=s['sweep_caption'] if manager.config['mode']=='flicks' else s['caption']) for s in SHAPES}
+    spells={s['id']:dict(SPELLS[s['id']],gesture=s['mixed']['caption'] if manager.config['mode']=='mixed' else s['sweep_caption'] if manager.config['mode']=='flicks' else s['caption']) for s in SHAPES}
     return dict(dev_mode=DEV_MODE, spells=spells, shapes=SHAPES, gesture_mode=manager.config['mode'], schema_version=2)
 
 @app.post('/api/rooms', status_code=201)
