@@ -1,7 +1,84 @@
-import {store,isLikelyPhone} from './common.js';
+import { store, isLikelyPhone } from "./common.js";
 export class Connection {
- constructor(code,{watch=false,onMessage=()=>{},onStatus=()=>{}}={}){this.code=code;this.watch=watch;this.onMessage=onMessage;this.onStatus=onStatus;this.closed=false;this.attempt=0;this.connect();this.ping=setInterval(()=>this.send({type:'ping',t:Date.now()}),10000);window.addEventListener('pagehide',()=>this.close());}
- connect(){this.ws=new WebSocket(`${location.protocol==='https:'?'wss':'ws'}://${location.host}/ws/${this.code}`);this.ws.onopen=()=>{this.attempt=0;this.onStatus(true);this.send(this.watch?{type:'watch'}:{type:'join',mobile_device:isLikelyPhone(),name:store.get('mage-name')||'Mage',token:store.get('mage-token-'+this.code)||null});};this.ws.onmessage=e=>{let m;try{m=JSON.parse(e.data);}catch{return;}if(m.type==='joined')store.set('mage-token-'+this.code,m.token);if(m.code==='audience_full'){this.closed=true;this.ws.close();clearInterval(this.ping);}if(m.code==='token_expired'){store.remove('mage-token-'+this.code);this.closed=true;this.ws.close();clearInterval(this.ping);}this.onMessage(m);};this.ws.onclose=e=>{this.onStatus(false,e);if(e.code===4001||e.code===1008){this.closed=true;clearInterval(this.ping);}if(!this.closed)this.timer=setTimeout(()=>this.connect(),Math.min(5000,500*2**this.attempt++));};this.ws.onerror=()=>this.ws.close();}
- send(message){if(this.ws.readyState!==WebSocket.OPEN)return false;this.ws.send(JSON.stringify(message));return true;}
- close(){this.closed=true;clearTimeout(this.timer);clearInterval(this.ping);this.ws.close();}
+  constructor(
+    code,
+    { watch = false, onMessage = () => {}, onStatus = () => {} } = {},
+  ) {
+    this.code = code;
+    this.watch = watch;
+    this.onMessage = onMessage;
+    this.onStatus = onStatus;
+    this.closed = false;
+    this.attempt = 0;
+    this.connect();
+    this.ping = setInterval(
+      () => this.send({ type: "ping", t: Date.now() }),
+      10000,
+    );
+    window.addEventListener("pagehide", () => this.close());
+  }
+  connect() {
+    this.ws = new WebSocket(
+      `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws/${this.code}`,
+    );
+    this.ws.onopen = () => {
+      this.attempt = 0;
+      this.onStatus(true);
+      this.send(
+        this.watch
+          ? { type: "watch" }
+          : {
+              type: "join",
+              mobile_device: isLikelyPhone(),
+              name: store.get("mage-name") || "Mage",
+              token: store.get("mage-token-" + this.code) || null,
+            },
+      );
+    };
+    this.ws.onmessage = (e) => {
+      let m;
+      try {
+        m = JSON.parse(e.data);
+      } catch {
+        return;
+      }
+      if (m.type === "joined") store.set("mage-token-" + this.code, m.token);
+      if (m.code === "audience_full") {
+        this.closed = true;
+        this.ws.close();
+        clearInterval(this.ping);
+      }
+      if (m.code === "token_expired") {
+        store.remove("mage-token-" + this.code);
+        this.closed = true;
+        this.ws.close();
+        clearInterval(this.ping);
+      }
+      this.onMessage(m);
+    };
+    this.ws.onclose = (e) => {
+      this.onStatus(false, e);
+      if (e.code === 4001 || e.code === 1008) {
+        this.closed = true;
+        clearInterval(this.ping);
+      }
+      if (!this.closed)
+        this.timer = setTimeout(
+          () => this.connect(),
+          Math.min(5000, 500 * 2 ** this.attempt++),
+        );
+    };
+    this.ws.onerror = () => this.ws.close();
+  }
+  send(message) {
+    if (this.ws.readyState !== WebSocket.OPEN) return false;
+    this.ws.send(JSON.stringify(message));
+    return true;
+  }
+  close() {
+    this.closed = true;
+    clearTimeout(this.timer);
+    clearInterval(this.ping);
+    this.ws.close();
+  }
 }

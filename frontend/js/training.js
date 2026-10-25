@@ -1,19 +1,147 @@
-import {$,escape,toast} from './common.js';
-import {SPELLS,diagram,caption,trail,gestureMode} from './spells.js';
-import {project,preview} from './projection.js';
+import { $, escape, toast } from "./common.js";
+import { SPELLS, diagram, caption, trail, gestureMode } from "./spells.js";
+import { project, preview } from "./projection.js";
 export class StrokeControl {
- constructor(button,motion,submit,onStart=()=>{}){this.button=button;this.motion=motion;this.submit=submit;this.onStart=onStart;this.pending=false;this.generation=0;this.down=e=>{if(button.disabled||this.pending||motion.capturing)return;if(e.type==='keydown'&&(e.code!=='Space'||e.repeat))return;e.preventDefault();try{motion.begin();this.generation++;this.onStart();if(e.pointerId!==undefined)button.setPointerCapture(e.pointerId);button.classList.add('capturing');this.timer=setTimeout(()=>this.finish(),2200);}catch(err){toast(err.message);}};this.up=e=>{if(e.type==='keyup'&&e.code!=='Space')return;e.preventDefault();this.finish();};this.cancel=()=>{this.generation++;clearTimeout(this.timer);motion.cancel();button.classList.remove('capturing');};for(const type of ['pointerdown','keydown'])button.addEventListener(type,this.down);for(const type of ['pointerup','keyup'])button.addEventListener(type,this.up);button.addEventListener('pointercancel',this.cancel);button.addEventListener('contextmenu',e=>e.preventDefault());this.visibility=()=>{if(document.hidden)this.cancel();};document.addEventListener('visibilitychange',this.visibility);window.addEventListener('blur',this.cancel);}
- async finish(){if(!this.motion.capturing||this.pending)return;clearTimeout(this.timer);this.pending=true;const generation=this.generation;try{const samples=await this.motion.end();if(generation!==this.generation)return;if(!samples||samples.length<2){toast('No sensor samples. Enable motion and try again.');return;}await this.submit({samples,platform:this.motion.platform,schema_version:2});}catch(e){toast(e.message);}finally{this.pending=false;this.button.classList.remove('capturing');}}
- destroy(){this.cancel();document.removeEventListener('visibilitychange',this.visibility);window.removeEventListener('blur',this.cancel);}
+  constructor(button, motion, submit, onStart = () => {}) {
+    this.button = button;
+    this.motion = motion;
+    this.submit = submit;
+    this.onStart = onStart;
+    this.pending = false;
+    this.generation = 0;
+    this.down = (e) => {
+      if (button.disabled || this.pending || motion.capturing) return;
+      if (e.type === "keydown" && (e.code !== "Space" || e.repeat)) return;
+      e.preventDefault();
+      try {
+        motion.begin();
+        this.generation++;
+        this.onStart();
+        if (e.pointerId !== undefined) button.setPointerCapture(e.pointerId);
+        button.classList.add("capturing");
+        this.timer = setTimeout(() => this.finish(), 2200);
+      } catch (err) {
+        toast(err.message);
+      }
+    };
+    this.up = (e) => {
+      if (e.type === "keyup" && e.code !== "Space") return;
+      e.preventDefault();
+      this.finish();
+    };
+    this.cancel = () => {
+      this.generation++;
+      clearTimeout(this.timer);
+      motion.cancel();
+      button.classList.remove("capturing");
+    };
+    for (const type of ["pointerdown", "keydown"])
+      button.addEventListener(type, this.down);
+    for (const type of ["pointerup", "keyup"])
+      button.addEventListener(type, this.up);
+    button.addEventListener("pointercancel", this.cancel);
+    button.addEventListener("contextmenu", (e) => e.preventDefault());
+    this.visibility = () => {
+      if (document.hidden) this.cancel();
+    };
+    document.addEventListener("visibilitychange", this.visibility);
+    window.addEventListener("blur", this.cancel);
+  }
+  async finish() {
+    if (!this.motion.capturing || this.pending) return;
+    clearTimeout(this.timer);
+    this.pending = true;
+    const generation = this.generation;
+    try {
+      const samples = await this.motion.end();
+      if (generation !== this.generation) return;
+      if (!samples || samples.length < 2) {
+        toast("No sensor samples. Enable motion and try again.");
+        return;
+      }
+      await this.submit({
+        samples,
+        platform: this.motion.platform,
+        schema_version: 2,
+      });
+    } catch (e) {
+      toast(e.message);
+    } finally {
+      this.pending = false;
+      this.button.classList.remove("capturing");
+    }
+  }
+  destroy() {
+    this.cancel();
+    document.removeEventListener("visibilitychange", this.visibility);
+    window.removeEventListener("blur", this.cancel);
+  }
 }
-export function feedbackHTML(){return '<div class="stroke-feedback"><canvas id="resultTrail" width="280" height="220" aria-label="Your stroke in gold over the expected shape in gray"></canvas><p id="resultHint" role="status"></p></div>';}
-export function showFeedback(container,result){const canvas=container.querySelector('canvas');trail(canvas,result.path,result.expected||result.top_guess);const hint=container.querySelector('[role="status"]');if(hint){const guess=SPELLS.find(s=>s.id===result.top_guess)?.name;hint.textContent=`${result.outcome==='cast'?'Cast':result.outcome==='no_cast'?'No cast':'Near miss'} · ${Math.round(result.score*100)}% match${guess?' · '+guess:''}. ${result.success===false&&result.outcome==='cast'?'Try the requested shape.':result.hint||''}${result.saved?' Sample saved.':''}`;}}
-export function trainingHTML(){return `<section class="panel training"><div class="eyebrow">Training Grounds</div><h2>Find your spell.</h2><p class="tiny">Complete three successful practice casts to unlock Ready. ${gestureMode==='mixed'?'Hold CAST, follow the diagram with a comfortable wrist motion, then release. Ward is a circle; Hex is a loose Z.':gestureMode==='flicks'?'Hold CAST, turn your wrist roughly toward the arrow, then release. Curves and a natural return are fine.':'Hold CAST, trace a shape, release.'}</p><label for="practiceSpell">PRACTICE SPELL</label><select id="practiceSpell">${SPELLS.map(s=>`<option value="${s.id}">${s.name}</option>`).join('')}</select><div id="practiceShape"></div><p id="practiceCaption" class="tiny"></p><canvas id="practiceTrail" width="280" height="220" aria-label="Live wand trail and expected spell shape"></canvas><button id="practiceCast" class="primary wide cast-surface">Hold to practice</button><label class="opt-in"><input id="savePractice" type="checkbox"> Save my labeled sensor recordings to help improve recognition (optional)</label><p id="practiceResult" role="status" class="status-line"></p><p id="practiceProgress" class="tiny">0 / 3 successful practice casts</p></section>`;}
+export function feedbackHTML() {
+  return '<div class="stroke-feedback"><canvas id="resultTrail" width="280" height="220" aria-label="Your stroke in gold over the expected shape in gray"></canvas><p id="resultHint" role="status"></p></div>';
+}
+export function showFeedback(container, result) {
+  const canvas = container.querySelector("canvas");
+  trail(canvas, result.path, result.expected || result.top_guess);
+  const hint = container.querySelector('[role="status"]');
+  if (hint) {
+    const guess = SPELLS.find((s) => s.id === result.top_guess)?.name;
+    hint.textContent = `${result.outcome === "cast" ? "Cast" : result.outcome === "no_cast" ? "No cast" : "Near miss"} · ${Math.round(result.score * 100)}% match${guess ? " · " + guess : ""}. ${result.success === false && result.outcome === "cast" ? "Try the requested shape." : result.hint || ""}${result.saved ? " Sample saved." : ""}`;
+  }
+}
+export function trainingHTML() {
+  return `<section class="panel training"><div class="eyebrow">Training Grounds</div><h2>Find your spell.</h2><p class="tiny">Complete three successful practice casts to unlock Ready. ${gestureMode === "mixed" ? "Hold CAST, follow the diagram with a comfortable wrist motion, then release. Ward is a circle; Hex is a loose Z." : gestureMode === "flicks" ? "Hold CAST, turn your wrist roughly toward the arrow, then release. Curves and a natural return are fine." : "Hold CAST, trace a shape, release."}</p><label for="practiceSpell">PRACTICE SPELL</label><select id="practiceSpell">${SPELLS.map((s) => `<option value="${s.id}">${s.name}</option>`).join("")}</select><div id="practiceShape"></div><p id="practiceCaption" class="tiny"></p><canvas id="practiceTrail" width="280" height="220" aria-label="Live wand trail and expected spell shape"></canvas><button id="practiceCast" class="primary wide cast-surface">Hold to practice</button><label class="opt-in"><input id="savePractice" type="checkbox"> Save my labeled sensor recordings to help improve recognition (optional)</label><p id="practiceResult" role="status" class="status-line"></p><p id="practiceProgress" class="tiny">0 / 3 successful practice casts</p></section>`;
+}
 export class Training {
- constructor(container,motion,submit){this.container=container;this.motion=motion;this.selected=container.querySelector('#practiceSpell');this.saved=container.querySelector('#savePractice');this.count=0;this.selected.onchange=()=>this.drawShape();this.control=new StrokeControl(container.querySelector('#practiceCast'),motion,payload=>{return submit({...payload,label:this.label,save_sample:this.saved.checked});},()=>{this.label=this.selected.value;});this.drawShape();}
- drawShape(){const s=SPELLS.find(s=>s.id===this.selected.value);this.container.querySelector('#practiceShape').innerHTML=diagram(s.id);this.container.querySelector('#practiceCaption').textContent=caption(s);trail(this.container.querySelector('canvas'),[],s.id);}
- live(){if(this.motion.capturing)trail(this.container.querySelector('canvas'),preview(this.motion.buffer),this.label||this.selected.value);}
- progress(n){this.count=n;this.container.querySelector('#practiceProgress').textContent=`${Math.min(3,n)} / 3 successful practice casts${n>=3?' · Ready unlocked':''}`;}
- result(r){trail(this.container.querySelector('canvas'),r.path,r.expected);this.container.querySelector('#practiceResult').textContent=`${r.success?'✓ Matched '+r.expected:r.outcome==='no_cast'?'No cast':r.top_guess?'Closest: '+r.top_guess:'Near miss'} · ${Math.round(r.score*100)}%. ${r.success?'Nice shape!':r.hint||'Try the requested shape.'}${r.saved?' Recording saved.':''}`;this.progress(r.practice_successes??(this.count+(r.success?1:0)));}
- destroy(){this.control.destroy();}
+  constructor(container, motion, submit) {
+    this.container = container;
+    this.motion = motion;
+    this.selected = container.querySelector("#practiceSpell");
+    this.saved = container.querySelector("#savePractice");
+    this.count = 0;
+    this.selected.onchange = () => this.drawShape();
+    this.control = new StrokeControl(
+      container.querySelector("#practiceCast"),
+      motion,
+      (payload) => {
+        return submit({
+          ...payload,
+          label: this.label,
+          save_sample: this.saved.checked,
+        });
+      },
+      () => {
+        this.label = this.selected.value;
+      },
+    );
+    this.drawShape();
+  }
+  drawShape() {
+    const s = SPELLS.find((s) => s.id === this.selected.value);
+    this.container.querySelector("#practiceShape").innerHTML = diagram(s.id);
+    this.container.querySelector("#practiceCaption").textContent = caption(s);
+    trail(this.container.querySelector("canvas"), [], s.id);
+  }
+  live() {
+    if (this.motion.capturing)
+      trail(
+        this.container.querySelector("canvas"),
+        preview(this.motion.buffer),
+        this.label || this.selected.value,
+      );
+  }
+  progress(n) {
+    this.count = n;
+    this.container.querySelector("#practiceProgress").textContent =
+      `${Math.min(3, n)} / 3 successful practice casts${n >= 3 ? " · Ready unlocked" : ""}`;
+  }
+  result(r) {
+    trail(this.container.querySelector("canvas"), r.path, r.expected);
+    this.container.querySelector("#practiceResult").textContent =
+      `${r.success ? "✓ Matched " + r.expected : r.outcome === "no_cast" ? "No cast" : r.top_guess ? "Closest: " + r.top_guess : "Near miss"} · ${Math.round(r.score * 100)}%. ${r.success ? "Nice shape!" : r.hint || "Try the requested shape."}${r.saved ? " Recording saved." : ""}`;
+    this.progress(r.practice_successes ?? this.count + (r.success ? 1 : 0));
+  }
+  destroy() {
+    this.control.destroy();
+  }
 }

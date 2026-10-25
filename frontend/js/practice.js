@@ -1,10 +1,41 @@
-import {enableSound,spellSound} from './sound.js';
-import {$,api,toast,spellGuide,isLikelyPhone} from './common.js';
-import {Motion} from './motion.js';
-import {setGestureMode} from './spells.js';
-import {Training,trainingHTML} from './training.js';
-const settings=await api('/api/settings');setGestureMode(settings.gesture_mode);$('#training').innerHTML=trainingHTML();$('#guide').innerHTML=spellGuide();let lastDraw=0;
-const motion=new Motion(()=>{$('#quality').textContent=motion.status();if(performance.now()-lastDraw>50){training.live();lastDraw=performance.now();}});
-const training=new Training($('#training'),motion,async payload=>{const r=await api('/api/practice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'practice_cast',...payload})});training.result(r);spellSound(r.spell,r.outcome);});
-if(!isLikelyPhone()){$('#enable').disabled=true;$('#quality').textContent='Open Training Grounds on your phone or tablet to practice motion casting. Laptops and desktops can watch the arena.';}
-$('#enable').onclick=async()=>{try{const permission=motion.enable();enableSound();await permission;setTimeout(()=>$('#quality').textContent=motion.status(),1800);}catch(e){toast(e.message);}};
+import { enableSound, spellSound } from "./sound.js";
+import { $, api, toast, spellGuide, isLikelyPhone } from "./common.js";
+import { Motion } from "./motion.js";
+import { setGestureMode } from "./spells.js";
+import { Training, trainingHTML } from "./training.js";
+const settings = await api("/api/settings");
+setGestureMode(settings.gesture_mode);
+$("#training").innerHTML = trainingHTML();
+$("#guide").innerHTML = spellGuide();
+let lastDraw = 0;
+const motion = new Motion(() => {
+  $("#quality").textContent = motion.status();
+  if (performance.now() - lastDraw > 50) {
+    training.live();
+    lastDraw = performance.now();
+  }
+});
+const training = new Training($("#training"), motion, async (payload) => {
+  const r = await api("/api/practice", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ type: "practice_cast", ...payload }),
+  });
+  training.result(r);
+  spellSound(r.spell, r.outcome);
+});
+if (!isLikelyPhone()) {
+  $("#enable").disabled = true;
+  $("#quality").textContent =
+    "Open Training Grounds on your phone or tablet to practice motion casting. Laptops and desktops can watch the arena.";
+}
+$("#enable").onclick = async () => {
+  try {
+    const permission = motion.enable();
+    enableSound();
+    await permission;
+    setTimeout(() => ($("#quality").textContent = motion.status()), 1800);
+  } catch (e) {
+    toast(e.message);
+  }
+};

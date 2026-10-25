@@ -1,22 +1,103 @@
-const dot=(a,b)=>a.reduce((s,v,i)=>s+v*b[i],0);
-const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
-const unit=v=>{const n=Math.hypot(...v);return v.map(x=>x/Math.max(n,1e-12));};
-const mean=a=>a[0].map((_,i)=>a.reduce((s,v)=>s+v[i],0)/a.length);
-export function project(rows){if(!rows.length)return [];const axes=rows.map(row=>{const [a,b,g]=row.slice(1,4).map(x=>x*Math.PI/180);const ca=Math.cos(a),sa=Math.sin(a),cb=Math.cos(b),sb=Math.sin(b),cg=Math.cos(g),sg=Math.sin(g);return {p:[-sa*cb,ca*cb,sb],r:[ca*cg-sa*sb*sg,sa*cg+ca*sb*sg,-cb*sg]};});const pointing=axes.map(a=>a.p);const f=unit(mean(pointing));if(Math.hypot(...f)<.5)return [];let u=[0,0,1].map((v,i)=>v-f[i]*f[2]),r;if(Math.hypot(...u)<Math.sin(20*Math.PI/180)){const right=mean(axes.map(a=>a.r));r=unit(right.map((v,i)=>v-f[i]*dot(right,f)));if(Math.hypot(...r)<.5)r=unit([1,0,0].map((v,i)=>v-f[i]*f[0]));u=unit(cross(r,f));}else{u=unit(u);r=unit(cross(f,u));}return pointing.map(p=>[Math.atan2(dot(p,r),dot(p,f))*180/Math.PI,Math.atan2(dot(p,u),dot(p,f))*180/Math.PI]);}
+const dot = (a, b) => a.reduce((s, v, i) => s + v * b[i], 0);
+const cross = (a, b) => [
+  a[1] * b[2] - a[2] * b[1],
+  a[2] * b[0] - a[0] * b[2],
+  a[0] * b[1] - a[1] * b[0],
+];
+const unit = (v) => {
+  const n = Math.hypot(...v);
+  return v.map((x) => x / Math.max(n, 1e-12));
+};
+const mean = (a) =>
+  a[0].map((_, i) => a.reduce((s, v) => s + v[i], 0) / a.length);
+export function project(rows) {
+  if (!rows.length) return [];
+  const axes = rows.map((row) => {
+    const [a, b, g] = row.slice(1, 4).map((x) => (x * Math.PI) / 180);
+    const ca = Math.cos(a),
+      sa = Math.sin(a),
+      cb = Math.cos(b),
+      sb = Math.sin(b),
+      cg = Math.cos(g),
+      sg = Math.sin(g);
+    return {
+      p: [-sa * cb, ca * cb, sb],
+      r: [ca * cg - sa * sb * sg, sa * cg + ca * sb * sg, -cb * sg],
+    };
+  });
+  const pointing = axes.map((a) => a.p);
+  const f = unit(mean(pointing));
+  if (Math.hypot(...f) < 0.5) return [];
+  let u = [0, 0, 1].map((v, i) => v - f[i] * f[2]),
+    r;
+  if (Math.hypot(...u) < Math.sin((20 * Math.PI) / 180)) {
+    const right = mean(axes.map((a) => a.r));
+    r = unit(right.map((v, i) => v - f[i] * dot(right, f)));
+    if (Math.hypot(...r) < 0.5)
+      r = unit([1, 0, 0].map((v, i) => v - f[i] * f[0]));
+    u = unit(cross(r, f));
+  } else {
+    u = unit(u);
+    r = unit(cross(f, u));
+  }
+  return pointing.map((p) => [
+    (Math.atan2(dot(p, r), dot(p, f)) * 180) / Math.PI,
+    (Math.atan2(dot(p, u), dot(p, f)) * 180) / Math.PI,
+  ]);
+}
 // Body-axis Rodrigues integration, used only when fused events are missing.
-export function integrate(matrix,rates,dt){const w=rates.map(x=>x*Math.PI/180*dt),angle=Math.hypot(...w);if(angle<1e-9)return matrix;const [x,y,z]=w.map(v=>v/angle),c=Math.cos(angle),s=Math.sin(angle),t=1-c;const q=[[t*x*x+c,t*x*y-s*z,t*x*z+s*y],[t*x*y+s*z,t*y*y+c,t*y*z-s*x],[t*x*z-s*y,t*y*z+s*x,t*z*z+c]];return matrix.map(row=>q[0].map((_,j)=>row.reduce((sum,v,k)=>sum+v*q[k][j],0)));}
-export function angles(matrix){return [Math.atan2(-matrix[0][1],matrix[1][1])*180/Math.PI,Math.asin(Math.max(-1,Math.min(1,matrix[2][1])))*180/Math.PI,Math.atan2(-matrix[2][0],matrix[2][2])*180/Math.PI];}
+export function integrate(matrix, rates, dt) {
+  const w = rates.map((x) => ((x * Math.PI) / 180) * dt),
+    angle = Math.hypot(...w);
+  if (angle < 1e-9) return matrix;
+  const [x, y, z] = w.map((v) => v / angle),
+    c = Math.cos(angle),
+    s = Math.sin(angle),
+    t = 1 - c;
+  const q = [
+    [t * x * x + c, t * x * y - s * z, t * x * z + s * y],
+    [t * x * y + s * z, t * y * y + c, t * y * z - s * x],
+    [t * x * z - s * y, t * y * z + s * x, t * z * z + c],
+  ];
+  return matrix.map((row) =>
+    q[0].map((_, j) => row.reduce((sum, v, k) => sum + v * q[k][j], 0)),
+  );
+}
+export function angles(matrix) {
+  return [
+    (Math.atan2(-matrix[0][1], matrix[1][1]) * 180) / Math.PI,
+    (Math.asin(Math.max(-1, Math.min(1, matrix[2][1]))) * 180) / Math.PI,
+    (Math.atan2(-matrix[2][0], matrix[2][2]) * 180) / Math.PI,
+  ];
+}
 
 // Match the server's horizontal-only wobble damping; preserve two-axis shapes.
-export function stabilizeHorizontal(path){
- if(path.length<2)return path;
- const extent=[0,1].map(i=>Math.max(...path.map(p=>p[i]))-Math.min(...path.map(p=>p[i])));
- if(extent[0]>=4&&extent[0]>2.5*extent[1]&&path.slice(1).reduce((sum,p,i)=>sum+Math.abs(p[0]-path[i][0]),0)<2.6*extent[0])return path.map(([x,y])=>[x,path[0][1]+.55*(y-path[0][1])]);
- return path;
+export function stabilizeHorizontal(path) {
+  if (path.length < 2) return path;
+  const extent = [0, 1].map(
+    (i) =>
+      Math.max(...path.map((p) => p[i])) - Math.min(...path.map((p) => p[i])),
+  );
+  if (
+    extent[0] >= 4 &&
+    extent[0] > 2.5 * extent[1] &&
+    path.slice(1).reduce((sum, p, i) => sum + Math.abs(p[0] - path[i][0]), 0) <
+      2.6 * extent[0]
+  )
+    return path.map(([x, y]) => [x, path[0][1] + 0.55 * (y - path[0][1])]);
+  return path;
 }
-export function preview(rows){
- const p=project(rows);
- // Five-sample moving average for the display, comparable to sensor cleanup.
- const smooth=p.map((_,i)=>[0,1].map(axis=>[-2,-1,0,1,2].reduce((v,k)=>v+p[Math.max(0,Math.min(p.length-1,i+k))][axis],0)/5));
- return stabilizeHorizontal(smooth);
+export function preview(rows) {
+  const p = project(rows);
+  // Five-sample moving average for the display, comparable to sensor cleanup.
+  const smooth = p.map((_, i) =>
+    [0, 1].map(
+      (axis) =>
+        [-2, -1, 0, 1, 2].reduce(
+          (v, k) => v + p[Math.max(0, Math.min(p.length - 1, i + k))][axis],
+          0,
+        ) / 5,
+    ),
+  );
+  return stabilizeHorizontal(smooth);
 }
