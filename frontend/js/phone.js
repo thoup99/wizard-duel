@@ -8,7 +8,7 @@ import {Training,trainingHTML,StrokeControl,feedbackHTML,showFeedback} from './t
 async function main(){
 const params=new URLSearchParams(location.search),code=(params.get('room')||'').toUpperCase();
 if(!/^[A-HJ-NP-Z]{4}$/.test(code)){location.replace('/');return;}
-if(!isLikelyPhone()&&params.get('player')!=='1'){location.replace('/arena?room='+code);return;}
+if(!isLikelyPhone()){location.replace('/arena?room='+code);return;}
 const settings=await api('/api/settings');setGestureMode(settings.gesture_mode);
 let me=null,state=null,phase='',dev=settings.dev_mode,enemyTarget=null,allyTarget=null,lastSeq=null,online=false,training=null,castControl=null,lastPaint=0;
 const motion=new Motion(()=>{if($('#motionStatus'))$('#motionStatus').textContent=motion.status();updateReady();if(performance.now()-lastPaint>50){training?.live();if(motion.capturing&&phase==='DUEL')trail($('#liveTrail'),preview(motion.buffer));lastPaint=performance.now();}});

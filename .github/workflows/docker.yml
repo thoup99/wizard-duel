@@ -27,6 +27,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium --only-shell
       - run: pip install -r requirements-dev.txt
       - run: python -m pytest -q
       - name: Check browser JavaScript
@@ -35,6 +38,16 @@ jobs:
         run: |
           node scripts/check_frontend.mjs
           node scripts/check_motion.mjs
+          node scripts/check_arena.mjs
+      - name: Check spectator arena and device routing in Chromium
+        run: npm run test:browser
+      - name: Save browser failure screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-test-results
+          path: test-results/
+          if-no-files-found: ignore
       - name: Evaluate legacy directional gestures
         run: python scripts/eval_synthetic.py --count 1000
       - name: Evaluate legacy beginner curves and returns

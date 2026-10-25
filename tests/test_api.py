@@ -5,6 +5,9 @@ from fastapi.testclient import TestClient
 from backend.app import main
 from test_gestures import sample
 
+MOBILE_UA='Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1'
+MOBILE_HEADERS={'user-agent':MOBILE_UA}
+
 def receive(ws, kind):
     for _ in range(40):
         m=ws.receive_json()
@@ -14,7 +17,7 @@ def receive(ws, kind):
 @pytest.fixture
 def client():
     main.manager.create_limits.clear()
-    with TestClient(main.app) as c:yield c
+    with TestClient(main.app,headers=MOBILE_HEADERS) as c:yield c
 
 def test_health_pages_and_config(client):
     assert client.get('/api/health').json()['game']=='Pocket Mages'

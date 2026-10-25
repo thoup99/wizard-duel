@@ -3,13 +3,13 @@ from contextlib import ExitStack
 import time
 from fastapi.testclient import TestClient
 from backend.app import main
-from test_api import receive
+from test_api import receive,MOBILE_HEADERS
 from test_gestures import sample
 
 
 def test_complete_match_via_motion_casts_then_rematch():
     main.manager.create_limits.clear()
-    with TestClient(main.app) as client, ExitStack() as stack:
+    with TestClient(main.app,headers=MOBILE_HEADERS) as client, ExitStack() as stack:
         code=client.post('/api/rooms').json()['code']
         sockets=[stack.enter_context(client.websocket_connect('/ws/'+code)) for _ in range(4)]
         identities=[]
@@ -46,7 +46,7 @@ def test_complete_match_via_motion_casts_then_rematch():
 
 def test_production_rejects_development_casts():
     main.manager.create_limits.clear()
-    with TestClient(main.app) as client:
+    with TestClient(main.app,headers=MOBILE_HEADERS) as client:
         code=client.post('/api/rooms').json()['code']
         with client.websocket_connect('/ws/'+code) as ws:
             ws.send_json({'type':'join','name':'Mage'});joined=receive(ws,'joined')

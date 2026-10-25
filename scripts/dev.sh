@@ -13,4 +13,5 @@ while (($#)); do
     *) echo "Unknown argument: $1" >&2; exit 2 ;;
   esac
 done
+npm run build
 exec "$python_bin" -m uvicorn backend.app.main:app --host "$app_host" --port "$app_port" --workers 1 --ws-max-size 65536

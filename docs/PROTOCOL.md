@@ -33,6 +33,8 @@ Empty sample arrays above are placeholders. Real windows contain 2–320 rows `[
 
 Practice is lobby-only and does not change combat stats. Three accepted casts matching the requested label unlock Ready; `sensors_ok` also must be true unless DEV_MODE. This quality assertion is a UX check, not anti-cheat. Successful progress persists across rematches. A team may shuffle its own name only in the lobby; names persist across rematches.
 
+`join` optionally includes `mobile_device: true` for iPad desktop-style Safari. Player joins from desktop user agents become spectators, even with a reconnect token; desktop `POST /api/rooms` is rejected with HTTP 403. Mobile Safari desktop-style requests use `X-Pocket-Mages-Mobile: 1` for room creation. Browser identifiers can be spoofed; this is a device-routing policy, not anti-cheat attestation.
+
 `joined` contains the private token and player ID. `spectator` identifies watch-only/overflow joins. Audience receives no player controls and cannot send gameplay or practice messages. `error` contains a friendly message; `audience_full` stops reconnect retries. `pong` echoes t.
 
 `state` contains phase, round, wins, team_names, name_position, public players (including practice_successes), effects, relative cooldowns, stats and recent sequenced events. The shuffled deck itself remains server-only. Never broadcast reconnect tokens.

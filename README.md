@@ -2,7 +2,7 @@
 
 **Four friends. Two teams. Your phone is your wand.**
 
-Pocket Mages v2 implements the original game and the Improvement Design Document: a motion-controlled, 2v2 browser party game. FastAPI owns combat; mobile browsers send gesture windows over WebSockets. No accounts, database, frontend framework, or frontend build step.
+Pocket Mages v2 implements the original game and the Improvement Design Document: a motion-controlled, 2v2 browser party game. FastAPI owns combat; mobile browsers send gesture windows over WebSockets. No accounts, database, or frontend framework. The Docker build packages a pinned Three.js dependency locally for the 3D spectator arena; no public CDN is required at runtime.
 
 ## Play locally with Docker
 
@@ -164,18 +164,20 @@ Phones need HTTPS and a browser supporting motion sensors. On iPhone, permission
 
 ## Development without Docker
 
-Python 3.12 is the tested runtime. From the repository root:
+Python 3.12 and Node 22 are the tested development tools. From the repository root:
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements-dev.txt
+npm ci
+npm run build
 uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --workers 1
 ```
 
-On Windows PowerShell, activate with `.venv\Scripts\Activate.ps1` instead. An optional `npm run dev` launcher uses port 3000; Node is not needed to run the game itself. Phone sensors still require HTTPS.
+On Windows PowerShell, activate with `.venv\Scripts\Activate.ps1` instead. An optional `npm run dev` launcher uses port 3000; Node is only needed to prepare browser assets; the running application and production image use Python. Phone sensors still require HTTPS.
 
-For desktop/manual-spell testing only:
+For manual-spell testing on a phone/tablet only:
 
 ```bash
 DEV_MODE=true uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --workers 1
@@ -224,13 +226,23 @@ CI also retains the earlier flick-mode evaluations (`eval_synthetic.py`, `eval_b
 
 ## Audience and team identity
 
-Desktop invite/code joins go directly to the arena, without a name prompt. The audience view has **Join as a player instead** for tablets/developers. Room creation still creates a player; the first player is host. A fifth player or new mid-match join becomes audience automatically. Audience connections cannot cast, ready, practice or shuffle names.
+Phones and tablets can create/join player lobbies. Laptops/desktops get watch-only controls; direct `/phone` links redirect to the arena and `?player=1` no longer bypasses this. The server also rejects desktop room creation and treats desktop player joins (including reconnect tokens) as spectator joins. iPad desktop-style Safari uses a touch-capability hint. This is normal browser routing, not device attestation against spoofed clients. A fifth player or mid-match join becomes audience. Audience cannot cast, ready, practice in a room, or shuffle names.
+
+The homepage contains one spell gallery and a concise How to Play section. Training Grounds is directly available from the navigation and its own prominent panel.
 
 Each room draws two names from `backend/config/team_names.json`. Players may shuffle only their own team's name in the lobby; names do not repeat until the shared shuffled deck is exhausted and remain through rematches. Team A uses a gold star; Team B uses a violet diamond. Both use green health and blue mana, with text labels. Team identity is separate from HP/mana colors.
 
+## 3D spectator arena
+
+`/arena?room=CODE` displays four original procedural cartoon mage models with idle steps, casting poses, Bolt projectiles, Ward bubbles, Empower halos, Hex effects, hit reactions, knockouts and winner celebrations. Movement is cosmetic: targeting and damage still come from the authoritative server. Server event sequence numbers prevent duplicate animation on repeated snapshots, and joining/reconnecting starts from current state rather than replaying historical spells.
+
+Use `/arena?demo=1` for a clearly labeled solo preview. It never creates a room or sends gameplay messages. The arena has pause/fullscreen controls, honors reduced-motion preferences, pauses animation when hidden/disconnected, caps effects and pixel ratio, and keeps live scores available if WebGL fails. Models use code-generated geometry and local Three.js 0.180.0 (MIT); the build copies its license into `/static/vendor/THREE-LICENSE.txt`.
+
+Run `npm ci && npm run build` for local assets. Docker performs this in a Node build stage; Node is absent from the production Python stage. `npm run test:browser` runs Chromium checks after `npx playwright install --with-deps chromium --only-shell`.
+
 ## Verification
 
-The expanded regression suite covers the original game rules and transport plus v2 projection, geometry matching, gating, practice readiness, recording consent, spectator authorization and team-name shuffling. CI also runs the 4,000-cast synthetic gate, shared JavaScript/Python projection checks, Compose validation and a built-container health check. Physical iPhone/Android tests and rendered browser QA still need to be completed on the deployed site.
+The expanded regression suite covers the original game rules and transport plus v2 projection, geometry matching, gating, practice readiness, recording consent, spectator authorization and team-name shuffling. CI also runs the 4,000-cast synthetic gate, shared JavaScript/Python projection checks, Compose validation and a built-container health check. Chromium browser checks cover 3D rendering, mobile layout, reduced motion, WebGL fallback, mobile room creation and desktop spectator routing. Physical iPhone/Android sensor testing still needs to be completed on the deployed site.
 
 ## Project map
 

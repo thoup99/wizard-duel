@@ -16,6 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, ValidationError
 
 from .engine import Room, SPELLS
+from .devices import mobile_browser
 from .gestures import DEFAULT_CONFIG, load_config, recognize, validate_samples, SHAPES
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -35,6 +36,7 @@ class Message(BaseModel):
     team: StrictInt | None = Field(default=None, ge=0, le=1)
     ready: StrictBool | None = None
     sensors_ok: StrictBool = False
+    mobile_device: StrictBool = False
     target_id: str | None = Field(default=None, max_length=40)
     platform: str = Field(default='other', pattern='^(ios|android|other)$')
     samples: list = Field(default_factory=list, max_length=320)
@@ -155,6 +157,8 @@ async def settings():
 
 @app.post('/api/rooms', status_code=201)
 async def create_room(request: Request):
+    if not mobile_browser(request.headers.get('user-agent',''),request.headers.get('x-pocket-mages-mobile')=='1'):
+        raise HTTPException(403,'Create and join player lobbies on a phone or tablet. Computers can spectate.')
     now = time.monotonic()
     ip = request.client.host if request.client else 'unknown'
     manager.create_limits = {k:v for k,v in manager.create_limits.items() if now-v[-1] < 60}
@@ -275,7 +279,9 @@ async def socket(ws: WebSocket, code: str):
                 if message.type in ('join', 'watch'):
                     if joined:
                         raise ValueError('Already joined.')
-                    if message.type == 'join':
+                    if message.type == 'join' and not mobile_browser(ws.headers.get('user-agent',''),message.mobile_device):
+                        peer.send(dict(type='spectator',message='Computers can spectate; join as a player on your phone or tablet.'))
+                    elif message.type == 'join':
                         if message.token:
                             player = next((p for p in room.players.values() if hmac.compare_digest(p.token, message.token)), None)
                             if player is None or (player.disconnected_at is not None and now-player.disconnected_at > 60):

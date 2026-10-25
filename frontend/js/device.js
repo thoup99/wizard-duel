@@ -1,1 +1,7 @@
-export function isLikelyPhone(env=window){const nav=env.navigator;const touch=nav.maxTouchPoints||0;const coarse=env.matchMedia?.('(pointer: coarse)').matches;const mobile=nav.userAgentData?.mobile;const ipad=nav.platform==='MacIntel'&&touch>1;const sensors=!!(env.DeviceMotionEvent||env.DeviceOrientationEvent);return !!(ipad||mobile||(coarse&&touch>0&&sensors));}
+export function isLikelyPhone(env=window){
+ const nav=env.navigator,ua=nav.userAgent||'',touch=nav.maxTouchPoints||0;
+ if(/Windows NT|CrOS/i.test(ua))return false;
+ if(/iPhone|iPad|iPod|Android/i.test(ua))return true;
+ if(nav.userAgentData?.mobile===true)return true;
+ return nav.platform==='MacIntel'&&touch>1;
+}

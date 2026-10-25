@@ -7,3 +7,8 @@ samples/
 recordings/
 *.zip
 .DS_Store
+
+node_modules/
+frontend/vendor/
+test-results/
+playwright-report/

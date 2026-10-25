@@ -10,3 +10,8 @@ recordings
 tests
 docs
 *.zip
+
+node_modules/
+frontend/vendor/
+test-results/
+playwright-report/

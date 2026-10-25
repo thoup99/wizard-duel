@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import {ArenaEvents} from '../frontend/js/arena-events.js';
+import {isLikelyPhone} from '../frontend/js/device.js';
+const tracker=new ArenaEvents();
+assert.deepEqual(tracker.consume({seq:20,events:[{seq:19},{seq:20}]}),[]);
+assert.deepEqual(tracker.consume({seq:22,events:[{seq:20},{seq:22},{seq:21}]}).map(e=>e.seq),[21,22]);
+assert.deepEqual(tracker.consume({seq:22,events:[{seq:22}]}),[]);
+tracker.reset();assert.deepEqual(tracker.consume({seq:30,events:[{seq:29},{seq:30}]}),[]);
+assert.deepEqual(tracker.consume({seq:1,events:[{seq:1}]}),[]);
+assert.equal(isLikelyPhone({navigator:{userAgent:'Mozilla/5.0 (Windows NT 10.0)',maxTouchPoints:10,userAgentData:{mobile:true},platform:'Win32'}}),false);
+assert.equal(isLikelyPhone({navigator:{userAgent:'Mozilla/5.0 (iPhone)',maxTouchPoints:5}}),true);
+assert.equal(isLikelyPhone({navigator:{userAgent:'Mozilla/5.0 (Macintosh)',platform:'MacIntel',maxTouchPoints:5}}),true);
+assert.equal(isLikelyPhone({navigator:{userAgent:'Mozilla/5.0 (Macintosh)',platform:'MacIntel',maxTouchPoints:0}}),false);
+console.log('Arena event deduplication, reconnect baseline, and device routing passed.');

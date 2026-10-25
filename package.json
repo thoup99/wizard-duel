@@ -2,8 +2,16 @@
   "name": "pocket-mages",
   "private": true,
   "type": "module",
-  "description": "Buildless browser client; Python runs the application.",
+  "description": "Pocket Mages browser client; local Three.js assets for the spectator arena.",
   "scripts": {
-    "dev": "bash scripts/dev.sh"
+    "dev": "bash scripts/dev.sh",
+    "build": "node scripts/build_frontend.mjs",
+    "test:browser": "playwright test"
+  },
+  "dependencies": {
+    "three": "0.180.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1"
   }
 }

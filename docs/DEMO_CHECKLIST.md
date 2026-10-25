@@ -24,7 +24,7 @@ Fallback if internet fails: a laptop hotspot and a certificate trusted by every 
 - Use the new gestures: Bolt right, Ward circle, Empower up, Hex Z-shaped zigzag. Test small wrist sweeps and natural returns before and after releasing CAST. Verify tiny/short/slow movement is No cast (no cooldown or accuracy penalty) and deliberate misses have a quarter-second cooldown.
 - On each teammate's phone, try each spell 20 times in Training Grounds. Target at least 85% accepted as intended, with at least one iPhone and one Android if available. During a four-player match, count deliberate fizzles; target under 15%.
 - Before three successful prompted casts, Ready must remain disabled. Incorrect spells cannot unlock it. Confirm live trail, gray ghost, score, hint and optional recording consent. With consent off, no practice files should appear.
-- Open an invite on a computer: go directly to the arena, no name/team prompt. Test Join as a player instead and a fifth phone joining as audience. Verify a full audience gets a friendly error.
+- Open an invite on a computer: go directly to the arena, no name/team prompt. Verify desktop creation is unavailable, `?player=1` cannot bypass spectator routing, and a fifth phone joins as audience. Verify a full audience gets a friendly error.
 - Shuffle each team's name and check all phones and the arena update. Only teammates can shuffle, only in the lobby; names stay through a rematch.
 - Verify gold-star and violet-diamond identities in lobby, HUD, arena and results. HP is green and mana blue for both teams; both are labeled. Check diagrams on iPhone Safari and Android Chrome and reduced-motion settings.
 - Check pre/post-roll, interrupted/cancelled presses, long presses and screen wake/portrait lock support. Losing focus must cancel a stroke, not cast it.
@@ -36,3 +36,7 @@ Fallback if internet fails: a laptop hotspot and a certificate trusted by every 
 - Verify incidental vertical twitching is reduced on a rightward Bolt, while Ward circles and Hex zigzags retain their vertical shape. Try oval circles from several starting points and loose Zs in both directions.
 
 - Check 40 starting mana, 1.5 mana/s regeneration, and 65-second rounds. Test the timeout tie-break: team HP, then surviving players’ mana; exact ties replay.
+
+- Open `/arena?demo=1` alone: confirm four animated cartoon mages and all four spell effects; check pause, fullscreen and mobile sizing.
+- Watch a real match: verify each cast plays once, shields/buffs match the scorecards, KO/winner poses match the server, and reconnect does not replay old spells.
+- Confirm the homepage has one spell gallery and direct Training Grounds links.
