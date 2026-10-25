@@ -1,0 +1,52 @@
+{
+  "bolt": {
+    "counts": {
+      "bolt": 999,
+      "ward": 0,
+      "empower": 0,
+      "hex": 0,
+      "rejected": 1
+    },
+    "accuracy": 0.999,
+    "wrong": 0.0
+  },
+  "ward": {
+    "counts": {
+      "bolt": 0,
+      "ward": 1000,
+      "empower": 0,
+      "hex": 0,
+      "rejected": 0
+    },
+    "accuracy": 1.0,
+    "wrong": 0.0
+  },
+  "empower": {
+    "counts": {
+      "bolt": 3,
+      "ward": 3,
+      "empower": 987,
+      "hex": 3,
+      "rejected": 4
+    },
+    "accuracy": 0.987,
+    "wrong": 0.009
+  },
+  "hex": {
+    "counts": {
+      "bolt": 4,
+      "ward": 2,
+      "empower": 4,
+      "hex": 985,
+      "rejected": 5
+    },
+    "accuracy": 0.985,
+    "wrong": 0.01
+  },
+  "negative_rejection": 0.973,
+  "latency_ms": {
+    "p95": 1.3037481998026113,
+    "max": 109.6464400000059
+  },
+  "passed": true
+}

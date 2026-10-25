@@ -35,7 +35,7 @@
         50
       ]
     ],
-    "sweep_caption": "Sweep right. Release before moving back."
+    "sweep_caption": "Sweep right. A small wrist turn is enough."
   },
   {
     "id": "ward",
@@ -60,7 +60,7 @@
         50
       ]
     ],
-    "sweep_caption": "Sweep left. Release before moving back."
+    "sweep_caption": "Sweep left. A small wrist turn is enough."
   },
   {
     "id": "empower",
@@ -94,7 +94,7 @@
         20
       ]
     ],
-    "sweep_caption": "Sweep up. Release before moving back."
+    "sweep_caption": "Sweep up. A small wrist turn is enough."
   },
   {
     "id": "hex",
@@ -128,6 +128,6 @@
         80
       ]
     ],
-    "sweep_caption": "Sweep down. Release before moving back."
+    "sweep_caption": "Sweep down. A small wrist turn is enough."
   }
 ]

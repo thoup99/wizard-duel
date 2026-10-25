@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CONFIG = ROOT / 'backend/config/gestures.json'
 SHAPES = json.loads((ROOT / 'frontend/spells.json').read_text())
 DEFAULTS = dict(mode='flicks', accept_score=.75, min_margin=.05, resample_points=64,
-                sample_hz=50, min_extent_deg=8, max_extent_deg=120, min_stroke_ms=250,
+                sample_hz=50, min_extent_deg=4, max_extent_deg=120, min_stroke_ms=250,
                 max_window_ms=2500, min_peak_speed_dps=40, fizzle_cooldown_s=.25)
 HINTS = dict(too_small='Draw it bigger: aim for 20–40 degrees of wrist movement.',
              too_short='Hold CAST while you finish the whole shape.',
@@ -172,9 +172,9 @@ def recognize(samples, platform='other', config=None, schema_version=2):
     def reject(reason,outcome='no_cast'):
         hint=HINTS[reason]
         if c['mode']=='flicks':
-            hint=dict(too_small='Aim the top of your phone a little farther in the arrow direction.', too_short='Hold CAST, make one short sweep, then release.', too_slow='Make one comfortable sweep in the arrow direction.', ambiguous='Follow one arrow: right, left, up or down.', no_match='Sweep once in the arrow direction. Release before returning to the start.')[reason]
+            hint=dict(too_small='Aim the top of your phone a little farther in the arrow direction.', too_short='Hold CAST, make one short sweep, then release.', too_slow='Make one comfortable sweep in the arrow direction.', ambiguous='Follow one arrow: right, left, up or down.', no_match='Make one small wrist sweep in the arrow direction; avoid repeated shaking.')[reason]
         result.update(reason=reason,outcome=outcome,hint=hint);return result
-    minimum_ms=min(c['min_stroke_ms'],150) if c['mode']=='flicks' else c['min_stroke_ms']
+    minimum_ms=min(c['min_stroke_ms'],80) if c['mode']=='flicks' else c['min_stroke_ms']
     if a[-1,0]*1000<minimum_ms:return reject('too_short')
     if a[-1,0]*1000>c['max_window_ms']:return reject('no_match','fizzle')
     try:times,path=clean_project(a,c)
@@ -184,7 +184,7 @@ def recognize(samples, platform='other', config=None, schema_version=2):
     if extent<c['min_extent_deg']:return reject('too_small')
     if extent>c['max_extent_deg']:return reject('no_match','fizzle')
     speeds=np.linalg.norm(np.diff(path,axis=0),axis=1)*c['sample_hz']
-    minimum_speed=min(c['min_peak_speed_dps'],15) if c['mode']=='flicks' else c['min_peak_speed_dps']
+    minimum_speed=min(c['min_peak_speed_dps'],8) if c['mode']=='flicks' else c['min_peak_speed_dps']
     if speeds.max(initial=0)<minimum_speed:return reject('too_slow')
     active=np.flatnonzero(speeds>max(6.,speeds.max()*.08))
     if len(active):
@@ -193,12 +193,22 @@ def recognize(samples, platform='other', config=None, schema_version=2):
     if (times[-1]-times[0])*1000<minimum_ms:return reject('too_short')
     result['path']=np.round(path,3).tolist()
     if c['mode']=='flicks':
-        delta=path[-1]-path[0];axis=int(np.argmax(abs(delta)))
-        # Coarse arc length ignores sensor jitter while retaining deliberate reversals.
-        coarse=np.column_stack([np.interp(np.linspace(0,len(path)-1,12),np.arange(len(path)),path[:,i]) for i in range(2)])
+        # Recognize the outward excursion, not net movement after the hand resets.
+        # Smooth/resample above suppresses jitter; a return after release is harmless.
+        origin=path[0]
+        distances=np.linalg.norm(path-origin,axis=1)
+        peak=int(np.argmax(distances))
+        if peak<2:return reject('too_small')
+        delta=path[peak]-origin;axis=int(np.argmax(abs(delta)))
+        outward=path[:peak+1]
+        coarse=np.column_stack([np.interp(np.linspace(0,len(outward)-1,12),np.arange(len(outward)),outward[:,i]) for i in range(2)])
         length=np.linalg.norm(np.diff(coarse,axis=0),axis=1).sum()
         straight=np.linalg.norm(delta)/max(length,1e-8)
-        if abs(delta[axis])<c['min_extent_deg'] or straight<.6:return reject('no_match','fizzle')
+        # Reject repeated shaking and scribbles while allowing one return sweep.
+        whole=resample(path,24)
+        total_length=np.linalg.norm(np.diff(whole,axis=0),axis=1).sum()
+        if abs(delta[axis])<c['min_extent_deg']:return reject('too_small')
+        if straight<.55 or total_length>2.6*np.linalg.norm(delta):return reject('no_match','fizzle')
         if abs(delta[axis])<1.25*abs(delta[1-axis]):return reject('ambiguous','fizzle')
         spell=('bolt' if delta[0]>0 else 'ward') if axis==0 else ('empower' if delta[1]>0 else 'hex')
         score=min(1.,.75+.25*straight);margin=1.

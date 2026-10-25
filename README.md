@@ -185,13 +185,13 @@ Development mode allows readiness without sensors and shows four direct spell bu
 
 ## Orientation gestures and Training Grounds (v2)
 
-The default controls are four single directional sweeps: right = Bolt, left = Ward, up = Empower, down = Hex. Hold CAST, turn the phone’s top edge in the arrow direction, then release before returning to the start. A comfortable 15–30 degree wrist movement is enough; there are no corners or loops to memorize.
+The default controls are four single directional sweeps: right = Bolt, left = Ward, up = Empower, down = Hex. Hold CAST, turn the phone’s top edge in the arrow direction, then release. Returning your hand naturally is fine. A comfortable 6–15 degree wrist movement is enough; there are no corners or loops to memorize.
 
 `frontend/spells.json` is the shared source for spell names, costs, colors, captions and shape geometry. It drives server templates and frontend SVG diagrams. The browser shows a live trail; the server makes all recognition and combat decisions. Each result includes a score, closest spell, reason and projected path for the ghost overlay. The arena displays the latest stroke too.
 
 Capture uses relative `deviceorientation` events with concurrent motion/orientation permission requests on iOS, about 150ms pre-roll and 100ms post-roll, and a 2.5-second maximum window. Gyro integration is a fallback when fused orientation is absent; its drift and initial grip assumptions still require device testing. A wake lock during a duel and portrait lock are requested where the browser supports them.
 
-Rows are `[seconds, alpha, beta, gamma, rx, ry, rz]` with `schema_version: 2`. Old clients and old acceleration recordings are rejected; refresh all phones after deploying. The backend sorts timestamps, removes duplicates, resamples pointing vectors at 50Hz, smooths and projects into the stroke plane. It never subtracts or interpolates Euler angles. Directional recognition uses net travel and a coarse path to tolerate sensor jitter and curved sweeps. It accepts strokes from 150ms and 15 degrees/second peak speed, with at least 8 degrees of travel. Near-diagonal and backtracking motions are rejected. Legacy shape mode resamples 64 points for template matching. Short/small/slow strokes are No cast; ambiguous or low-scoring deliberate shapes fizzle.
+Rows are `[seconds, alpha, beta, gamma, rx, ry, rz]` with `schema_version: 2`. Old clients and old acceleration recordings are rejected; refresh all phones after deploying. The backend sorts timestamps, removes duplicates, resamples pointing vectors at 50Hz, smooths and projects into the stroke plane. It never subtracts or interpolates Euler angles. Directional recognition uses the largest outward excursion and a coarse path to tolerate sensor jitter, curved sweeps, and a natural return to the starting position. It accepts strokes from 80ms and 8 degrees/second peak speed, with at least 4 degrees of travel. Near-diagonal motions and repeated shaking are rejected. Legacy shape mode resamples 64 points for template matching. Short/small/slow strokes are No cast; ambiguous or low-scoring deliberate shapes fizzle.
 
 - `/practice`: standalone Training Grounds, also linked from How to Play.
 - Lobby Training Grounds: three server-confirmed matches unlock Ready. Standalone practice does not grant room readiness.
@@ -199,7 +199,7 @@ Rows are `[seconds, alpha, beta, gamma, rx, ry, rz]` with `schema_version: 2`. O
 - `/debug` and `/record`: orientation/gyro graphs and labeled JSON capture; downloads require no admin token.
 - `backend/config/gestures.json`: reloadable matching/gating thresholds, including `accept_score`, `min_margin`, and `fizzle_cooldown_s`.
 
-`mode: flicks` is now the default. Set `mode: shapes` only to restore the legacy Z/circle/^/V controls. Refresh every browser after changing modes. Production can bind-mount an edited config at `/app/backend/config/gestures.json:ro`; update existing mounted configs to `flicks` too. Reloading or saving manually from the lab requires `ADMIN_TOKEN`.
+`mode: flicks` is now the default. Set `mode: shapes` only to restore the legacy Z/circle/^/V controls. Refresh every browser after changing modes. Production can bind-mount an edited config at `/app/backend/config/gestures.json:ro`; update existing mounted configs to `flicks` and `min_extent_deg: 4` too. Reloading or saving manually from the lab requires `ADMIN_TOKEN`.
 
 ```bash
 python scripts/eval_gestures.py recordings/ --minimum-accuracy 0.85
@@ -208,7 +208,7 @@ node scripts/check_frontend.mjs
 python -m pytest -q
 ```
 
-The deterministic default-mode evaluation covers 1,000 noisy sweeps per spell and 1,000 negative movements. See `docs/sweep-results.json`: correct recognition ranged from 98.3% to 99.9%, wrong-spell selections were at most 1%, and 99.9% of negatives were rejected. These are synthetic results, not real-phone accuracy. `docs/synthetic-results.json` preserves the earlier legacy shape results.
+The deterministic default-mode evaluation covers 1,000 noisy sweeps per spell and 1,000 negative movements. See `docs/sensitivity-results.json`: correct recognition ranged from 98.5% to 100%, wrong-spell selections were at most 1%, and 97.3% of negatives were rejected. The lower movement threshold trades some rejection of random movement for easier intentional casting. These are synthetic results, not real-phone accuracy. `docs/sweep-results.json` and `docs/synthetic-results.json` preserve the earlier sweep and legacy shape results.
 
 ## Audience and team identity
 
