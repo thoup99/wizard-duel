@@ -150,7 +150,8 @@ async def health():
 
 @app.get('/api/settings')
 async def settings():
-    return dict(dev_mode=DEV_MODE, spells=SPELLS, shapes=SHAPES, gesture_mode=manager.config['mode'], schema_version=2)
+    spells={s['id']:dict(SPELLS[s['id']],gesture=s['sweep_caption'] if manager.config['mode']=='flicks' else s['caption']) for s in SHAPES}
+    return dict(dev_mode=DEV_MODE, spells=spells, shapes=SHAPES, gesture_mode=manager.config['mode'], schema_version=2)
 
 @app.post('/api/rooms', status_code=201)
 async def create_room(request: Request):

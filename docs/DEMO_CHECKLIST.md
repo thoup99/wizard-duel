@@ -21,7 +21,7 @@ Fallback if internet fails: a laptop hotspot and a certificate trusted by every 
 
 - Refresh every browser after updating; old acceleration payloads are not compatible.
 - Verify iOS asks for both motion and orientation access on the same tap. Test battery-saver/low-rate, denied permissions and non-HTTPS messages. Check gyro fallback separately if fused events are absent.
-- Use the new gestures: Bolt Z, Ward circle, Empower ^, Hex V. Cast both directions. Verify tiny/short/slow movement is No cast (no cooldown or accuracy penalty) and deliberate misses have a quarter-second cooldown.
+- Use the new gestures: Bolt right, Ward left, Empower up, Hex down. Release before moving back. Verify tiny/short/slow movement is No cast (no cooldown or accuracy penalty) and deliberate misses have a quarter-second cooldown.
 - On each teammate's phone, try each spell 20 times in Training Grounds. Target at least 85% accepted as intended, with at least one iPhone and one Android if available. During a four-player match, count deliberate fizzles; target under 15%.
 - Before three successful prompted casts, Ready must remain disabled. Incorrect spells cannot unlock it. Confirm live trail, gray ghost, score, hint and optional recording consent. With consent off, no practice files should appear.
 - Open an invite on a computer: go directly to the arena, no name/team prompt. Test Join as a player instead and a fifth phone joining as audience. Verify a full audience gets a friendly error.
@@ -29,4 +29,4 @@ Fallback if internet fails: a laptop hotspot and a certificate trusted by every 
 - Verify gold-star and violet-diamond identities in lobby, HUD, arena and results. HP is green and mana blue for both teams; both are labeled. Check diagrams on iPhone Safari and Android Chrome and reduced-motion settings.
 - Check pre/post-roll, interrupted/cancelled presses, long presses and screen wake/portrait lock support. Losing focus must cancel a stroke, not cast it.
 - Measure release-to-result latency including the 100ms post-roll. Target under 300ms; synthetic recognition time alone does not prove this.
-- Try configuration mode flicks (right/left/up/down) as Plan B, then reload config and refresh all clients so displayed instructions agree.
+- The default is flicks (right/left/up/down). Optionally test legacy shapes mode, then reload config and refresh all clients so displayed instructions agree.

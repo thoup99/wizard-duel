@@ -1,8 +1,9 @@
 import {$,api,toast,spellGuide} from './common.js';
 import {Motion} from './motion.js';
 import {StrokeControl} from './training.js';
-import {setGestureMode} from './spells.js';
+import {setGestureMode,SPELLS,caption} from './spells.js';
 const settings=await api('/api/settings');setGestureMode(settings.gesture_mode);
+for(const s of SPELLS) document.querySelector(`#label option[value="${s.id}"]`).textContent=s.name+" · "+caption(s);
 let history=[],record=null,lastDraw=0;
 const motion=new Motion(row=>{history.push(row);history=history.slice(-200);$('#sensorStatus').textContent=motion.status();if(performance.now()-lastDraw>50){draw('acceleration',1,360);draw('rotation',4,240);lastDraw=performance.now();}});
 $('#enable').onclick=async()=>{try{await motion.enable();$('#sensorStatus').textContent='Permission granted. Waiting for orientation data…';setTimeout(()=>$('#sensorStatus').textContent=motion.status(),1800);}catch(e){toast(e.message);}};

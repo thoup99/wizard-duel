@@ -1,13 +1,17 @@
 import numpy as np
 import pytest
 from backend.app.gestures import recognize,validate_samples,project,load_config
-from scripts.synthetic_gestures import path_to_rows,ideal
+from scripts.synthetic_gestures import path_to_rows,ideal,sweep
+
+def recognize(samples, **kwargs):
+    kwargs.setdefault('config',dict(load_config(),mode='shapes'))
+    return __import__('backend.app.gestures',fromlist=['recognize']).recognize(samples,**kwargs)
 
 def sample(spell):
-    return path_to_rows([[0,0],[0,0]] if spell=='idle' else ideal(spell))
+    return path_to_rows([[0,0],[0,0]] if spell=='idle' else sweep(spell))
 
 @pytest.mark.parametrize('spell',['bolt','ward','empower','hex'])
-def test_synthetic_signatures(spell):assert recognize(sample(spell))['spell']==spell
+def test_synthetic_signatures(spell):assert recognize(path_to_rows(ideal(spell)))['spell']==spell
 
 def test_idle_no_cast():assert recognize(sample('idle'))['outcome']=='no_cast'
 
@@ -22,13 +26,13 @@ def test_facing_grip_roll_and_reverse(spell,facing,tilt,roll):
         r=recognize(path_to_rows(ideal(spell,30,reverse),facing=facing,tilt=tilt,roll=roll));assert r['spell']==spell,r
 
 def test_caret_never_becomes_v():
-    assert recognize(sample('empower'))['spell']!='hex';assert recognize(sample('hex'))['spell']!='empower'
+    assert recognize(path_to_rows(ideal('empower')))['spell']!='hex';assert recognize(path_to_rows(ideal('hex')))['spell']!='empower'
 
 def test_schema_rejects_old_clients():
     with pytest.raises(ValueError):recognize(sample('bolt'),schema_version=1)
 
 def test_cleaning_sorts_and_deduplicates():
-    rows=sample('bolt');assert recognize(rows[::-1]+rows[10:14])['spell']=='bolt'
+    rows=path_to_rows(ideal('bolt'));assert recognize(rows[::-1]+rows[10:14])['spell']=='bolt'
 
 def test_small_short_and_slow_reason_codes():
     assert recognize(path_to_rows(ideal('bolt',2)))['reason']=='too_small'

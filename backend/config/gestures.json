@@ -1,13 +1,13 @@
 {
- "mode":"shapes",
- "accept_score":0.75,
- "min_margin":0.05,
- "resample_points":64,
- "sample_hz":50,
- "min_extent_deg":8,
- "max_extent_deg":120,
- "min_stroke_ms":250,
- "max_window_ms":2500,
- "min_peak_speed_dps":40,
- "fizzle_cooldown_s":0.25
+  "mode": "flicks",
+  "accept_score": 0.75,
+  "min_margin": 0.05,
+  "resample_points": 64,
+  "sample_hz": 50,
+  "min_extent_deg": 8,
+  "max_extent_deg": 120,
+  "min_stroke_ms": 250,
+  "max_window_ms": 2500,
+  "min_peak_speed_dps": 40,
+  "fizzle_cooldown_s": 0.25
 }

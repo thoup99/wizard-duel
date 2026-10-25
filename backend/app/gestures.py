@@ -11,7 +11,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CONFIG = ROOT / 'backend/config/gestures.json'
 SHAPES = json.loads((ROOT / 'frontend/spells.json').read_text())
-DEFAULTS = dict(mode='shapes', accept_score=.75, min_margin=.05, resample_points=64,
+DEFAULTS = dict(mode='flicks', accept_score=.75, min_margin=.05, resample_points=64,
                 sample_hz=50, min_extent_deg=8, max_extent_deg=120, min_stroke_ms=250,
                 max_window_ms=2500, min_peak_speed_dps=40, fizzle_cooldown_s=.25)
 HINTS = dict(too_small='Draw it bigger: aim for 20–40 degrees of wrist movement.',
@@ -170,8 +170,12 @@ def recognize(samples, platform='other', config=None, schema_version=2):
     c=config or load_config();a=validate_samples(samples)
     result=dict(outcome='no_cast',spell=None,score=0.,top_guess=None,reason=None,path=[],scores={})
     def reject(reason,outcome='no_cast'):
-        result.update(reason=reason,outcome=outcome,hint=HINTS[reason]);return result
-    if a[-1,0]*1000<c['min_stroke_ms']:return reject('too_short')
+        hint=HINTS[reason]
+        if c['mode']=='flicks':
+            hint=dict(too_small='Aim the top of your phone a little farther in the arrow direction.', too_short='Hold CAST, make one short sweep, then release.', too_slow='Make one comfortable sweep in the arrow direction.', ambiguous='Follow one arrow: right, left, up or down.', no_match='Sweep once in the arrow direction. Release before returning to the start.')[reason]
+        result.update(reason=reason,outcome=outcome,hint=hint);return result
+    minimum_ms=min(c['min_stroke_ms'],150) if c['mode']=='flicks' else c['min_stroke_ms']
+    if a[-1,0]*1000<minimum_ms:return reject('too_short')
     if a[-1,0]*1000>c['max_window_ms']:return reject('no_match','fizzle')
     try:times,path=clean_project(a,c)
     except ValueError:return reject('no_match','fizzle')
@@ -180,20 +184,24 @@ def recognize(samples, platform='other', config=None, schema_version=2):
     if extent<c['min_extent_deg']:return reject('too_small')
     if extent>c['max_extent_deg']:return reject('no_match','fizzle')
     speeds=np.linalg.norm(np.diff(path,axis=0),axis=1)*c['sample_hz']
-    if speeds.max(initial=0)<c['min_peak_speed_dps']:return reject('too_slow')
+    minimum_speed=min(c['min_peak_speed_dps'],15) if c['mode']=='flicks' else c['min_peak_speed_dps']
+    if speeds.max(initial=0)<minimum_speed:return reject('too_slow')
     active=np.flatnonzero(speeds>max(6.,speeds.max()*.08))
     if len(active):
         start=max(0,active[0]-2);end=min(len(path),active[-1]+4)
         path=path[start:end];times=times[start:end]
-    if (times[-1]-times[0])*1000<c['min_stroke_ms']:return reject('too_short')
+    if (times[-1]-times[0])*1000<minimum_ms:return reject('too_short')
     result['path']=np.round(path,3).tolist()
     if c['mode']=='flicks':
         delta=path[-1]-path[0];axis=int(np.argmax(abs(delta)))
-        length=np.linalg.norm(np.diff(path,axis=0),axis=1).sum()
+        # Coarse arc length ignores sensor jitter while retaining deliberate reversals.
+        coarse=np.column_stack([np.interp(np.linspace(0,len(path)-1,12),np.arange(len(path)),path[:,i]) for i in range(2)])
+        length=np.linalg.norm(np.diff(coarse,axis=0),axis=1).sum()
         straight=np.linalg.norm(delta)/max(length,1e-8)
-        if abs(delta[axis])<c['min_extent_deg'] or straight<.65:return reject('no_match','fizzle')
+        if abs(delta[axis])<c['min_extent_deg'] or straight<.6:return reject('no_match','fizzle')
+        if abs(delta[axis])<1.25*abs(delta[1-axis]):return reject('ambiguous','fizzle')
         spell=('bolt' if delta[0]>0 else 'ward') if axis==0 else ('empower' if delta[1]>0 else 'hex')
-        score=straight;margin=1.
+        score=min(1.,.75+.25*straight);margin=1.
     else:spell,score,margin,scores=match_path(path,c);result['scores']=scores
     result.update(score=round(score,4),top_guess=spell)
     if score<c['accept_score']:return reject('no_match','fizzle')

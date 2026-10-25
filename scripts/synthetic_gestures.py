@@ -21,3 +21,8 @@ def ideal(spell,extent=30,reverse=False,start=0):
     else:p=np.array(shapes[spell],float)
     p*=extent
     return p[::-1] if reverse else p
+
+
+def sweep(spell,extent=30):
+    end={'bolt':[1,0],'ward':[-1,0],'empower':[0,1],'hex':[0,-1]}[spell]
+    return np.array([[0,0],end],float)*extent
